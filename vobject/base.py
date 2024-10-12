@@ -17,28 +17,6 @@ try:
 except NameError:
     basestring = (str, bytes)
 
-# One more problem ... in python2 the str operator breaks on unicode
-# objects containing non-ascii characters
-try:
-    unicode
-
-    def str_(s):
-        """
-        Return byte string with correct encoding
-        """
-        if type(s) == unicode:
-            return s.encode("utf-8")
-        else:
-            return str(s)
-
-except NameError:
-
-    def str_(s):
-        """
-        Return string
-        """
-        return s
-
 
 if not isinstance(b"", type("")):
     unicode_type = str
@@ -398,12 +376,12 @@ class ContentLine(VBase):
         which are legal in IANA tokens.
         """
         if name.endswith("_param"):
-            if type(value) == list:
+            if type(value) is list:
                 self.params[toVName(name, 6, True)] = value
             else:
                 self.params[toVName(name, 6, True)] = [value]
         elif name.endswith("_paramlist"):
-            if type(value) == list:
+            if type(value) is list:
                 self.params[toVName(name, 10, True)] = value
             else:
                 raise VObjectError("Parameter list set to a non-list")
@@ -438,7 +416,7 @@ class ContentLine(VBase):
     def __str__(self):
         try:
             return "<{0}{1}{2}>".format(self.name, self.params, self.valueRepr())
-        except UnicodeEncodeError as e:
+        except UnicodeEncodeError:
             return "<{0}{1}{2}>".format(self.name, self.params, self.valueRepr().encode("utf-8"))
 
     def __repr__(self):
@@ -549,7 +527,7 @@ class Component(VBase):
         which are legal in IANA tokens.
         """
         if name not in self.normal_attributes and name.lower() == name:
-            if type(value) == list:
+            if type(value) is list:
                 if name.endswith("_list"):
                     name = name[:-5]
                 self.contents[toVName(name)] = value
@@ -1047,7 +1025,7 @@ def defaultSerialize(obj, buf, lineLength):
 
         if obj.group is not None:
             s.write(obj.group + ".")
-        s.write(str_(obj.name.upper()))
+        s.write(obj.name.upper())
         keys = sorted(obj.params.keys())
         for key in keys:
             paramstr = ",".join(dquoteEscape(p) for p in obj.params[key])
@@ -1234,6 +1212,20 @@ def newFromBehavior(name, id=None):
         obj = Component(name)
     else:
         obj = ContentLine(name, [], "")
+    obj.behavior = behavior
+    obj.isNative = False
+    return obj
+
+
+def new_from_behavior(name, _id=None):
+    """
+    Given a name, return a behaviored ContentLine or Component.
+    """
+    name = name.upper()
+    behavior = getBehavior(name, _id)
+    if behavior is None:
+        raise VObjectError(f"No behavior found named {name!s}")
+    obj = Component(name) if behavior.isComponent else ContentLine(name, [], "")
     obj.behavior = behavior
     obj.isNative = False
     return obj

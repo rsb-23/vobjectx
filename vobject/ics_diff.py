@@ -4,6 +4,8 @@ from optparse import OptionParser
 
 import vobject
 
+from .base import new_from_behavior, readOne
+
 """
 Compare VTODOs and VEVENTs in two iCalendar sources.
 """
@@ -135,8 +137,8 @@ def diff(left, right):
         if len(differentContentLines) == 0 and len(differentComponents) == 0:
             return None
         else:
-            left = newFromBehavior(leftComp.name)
-            right = newFromBehavior(leftComp.name)
+            left = new_from_behavior(leftComp.name)
+            right = new_from_behavior(leftComp.name)
             # add a UID, if one existed, despite the fact that they'll always be
             # the same
             uid = leftComp.getChildValue("uid")

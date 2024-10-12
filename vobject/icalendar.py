@@ -8,9 +8,12 @@ import logging
 import random  # for generating a UID
 import socket
 import string
+from functools import partial
 
 import six
 from dateutil import rrule, tz
+
+from .exceptions import AllException
 
 try:
     import pytz
@@ -54,7 +57,6 @@ FREQUENCIES = ("YEARLY", "MONTHLY", "WEEKLY", "DAILY", "HOURLY", "MINUTELY", "SE
 
 zeroDelta = datetime.timedelta(0)
 twoHours = datetime.timedelta(hours=2)
-
 
 # ---------------------------- TZID registry -----------------------------------
 __tzidMap = {}
@@ -445,9 +447,9 @@ class RecurringComponent(Component):
                         return None
 
                 if name in DATENAMES:
-                    if type(line.value[0]) == datetime.datetime:
+                    if type(line.value[0]) is datetime.datetime:
                         list(map(addfunc, line.value))
-                    elif type(line.value[0]) == datetime.date:
+                    elif type(line.value[0]) is datetime.date:
                         for dt in line.value:
                             addfunc(datetime.datetime(dt.year, dt.month, dt.day))
                     else:
@@ -530,20 +532,16 @@ class RecurringComponent(Component):
                         if name == "rrule":
                             if rruleset._rrule[-1][0] != adddtstart:
                                 rruleset.rdate(adddtstart)
-                                added = True
+
                                 if rruleset._rrule[-1]._count is not None:
                                     rruleset._rrule[-1]._count -= 1
-                            else:
-                                added = False
+
                         elif name == "rdate":
                             if rruleset._rdate[0] != adddtstart:
                                 rruleset.rdate(adddtstart)
-                                added = True
-                            else:
-                                added = False
                     except IndexError:
                         # it's conceivable that an rrule has 0 datetimes
-                        added = False
+                        pass
 
         return rruleset
 
@@ -563,7 +561,7 @@ class RecurringComponent(Component):
             untilSerialize = dateToString
         else:
             # make sure to convert time zones to UTC
-            untilSerialize = lambda x: dateTimeToString(x, True)
+            untilSerialize = partial(datetime_to_string, convert_to_utc=True)
 
         for name in DATESANDRULES:
             if name in self.contents:
@@ -846,7 +844,7 @@ class DateOrDateTimeBehavior(behavior.Behavior):
         """
         Replace the date or datetime in obj.value with an ISO 8601 string.
         """
-        if type(obj.value) == datetime.date:
+        if type(obj.value) is datetime.date:
             obj.isNative = False
             obj.value_param = "DATE"
             obj.value = dateToString(obj.value)
@@ -892,7 +890,7 @@ class MultiDateBehavior(behavior.Behavior):
         Replace the date, datetime or period tuples in obj.value with
         appropriate strings.
         """
-        if obj.value and type(obj.value[0]) == datetime.date:
+        if obj.value and type(obj.value[0]) is datetime.date:
             obj.isNative = False
             obj.value_param = "DATE"
             obj.value = ",".join([dateToString(val) for val in obj.value])
@@ -904,7 +902,7 @@ class MultiDateBehavior(behavior.Behavior):
                 transformed = []
                 tzid = None
                 for val in obj.value:
-                    if tzid is None and type(val) == datetime.datetime:
+                    if tzid is None and type(val) is datetime.datetime:
                         tzid = TimezoneComponent.registerTzinfo(val.tzinfo)
                         if tzid is not None:
                             obj.tzid_param = tzid
@@ -990,7 +988,7 @@ class VCalendar2_0(VCalendarComponentBehavior):
                 if getattr(obj, "tzid_param", None):
                     table[obj.tzid_param] = 1
                 else:
-                    if type(obj.value) == list:
+                    if type(obj.value) is list:
                         for item in obj.value:
                             tzinfo = getattr(obj.value, "tzinfo", None)
                             tzid = TimezoneComponent.registerTzinfo(tzinfo)
@@ -1027,13 +1025,9 @@ class VCalendar2_0(VCalendarComponentBehavior):
         cls.generateImplicitParameters(obj)
         if validate:
             cls.validate(obj, raiseException=True)
-        if obj.isNative:
-            transformed = obj.transformFromNative()
-            undoTransform = True
-        else:
-            transformed = obj
-            undoTransform = False
-        out = None
+
+        undoTransform = bool(obj.isNative)
+
         outbuf = buf or six.StringIO()
         if obj.group is None:
             groupString = ""
@@ -1049,7 +1043,7 @@ class VCalendar2_0(VCalendarComponentBehavior):
             first_components = [
                 s for s in cls.sortFirst if s in obj.contents and isinstance(obj.contents[s][0], Component)
             ]
-        except Exception:
+        except AllException:
             first_props = first_components = []
             # first_components = []
 
@@ -1563,7 +1557,7 @@ class Trigger(behavior.Behavior):
                     obj.isNative = False
                     dt = DateTimeBehavior.transformToNative(obj)
                     return dt
-                except:
+                except AllException:
                     msg = "TRIGGER with no VALUE not recognized as DURATION " "or as DATE-TIME"
                     raise ParseError(msg)
         elif value == "DATE-TIME":
@@ -1575,10 +1569,10 @@ class Trigger(behavior.Behavior):
 
     @staticmethod
     def transformFromNative(obj):
-        if type(obj.value) == datetime.datetime:
+        if type(obj.value) is datetime.datetime:
             obj.value_param = "DATE-TIME"
             return UTCDateTimeBehavior.transformFromNative(obj)
-        elif type(obj.value) == datetime.timedelta:
+        elif type(obj.value) is datetime.timedelta:
             return Duration.transformFromNative(obj)
         else:
             raise NativeError("Native TRIGGER values must be timedelta or " "datetime")
@@ -1651,7 +1645,6 @@ class RRule(behavior.Behavior):
 registerBehavior(RRule, "RRULE")
 registerBehavior(RRule, "EXRULE")
 
-
 # ------------------------ Registration of common classes ----------------------
 utcDateTimeList = ["LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP"]
 list(map(lambda x: registerBehavior(UTCDateTimeBehavior, x), utcDateTimeList))
@@ -1661,7 +1654,6 @@ list(map(lambda x: registerBehavior(DateOrDateTimeBehavior, x), dateTimeOrDateLi
 
 registerBehavior(MultiDateBehavior, "RDATE")
 registerBehavior(MultiDateBehavior, "EXDATE")
-
 
 textList = [
     "CALSCALE",
@@ -1770,6 +1762,19 @@ def dateTimeToString(dateTime, convertToUTC=False):
     return datestr
 
 
+def datetime_to_string(date_time, convert_to_utc=False) -> str:
+    """
+    Ignore tzinfo unless convert_to_utc.  Output string.
+    """
+    if date_time.tzinfo and convert_to_utc:
+        date_time = date_time.astimezone(utc)
+
+    datestr = date_time.strftime("%Y%m%dT%H%M%S")
+    if tzinfo_eq(date_time.tzinfo, utc):
+        datestr += "Z"
+    return datestr
+
+
 def deltaToOffset(delta):
     absDelta = abs(delta)
     hours = int(absDelta.seconds / 3600)
@@ -1821,7 +1826,7 @@ def stringToDateTime(s, tzinfo=None, strict=False):
         second = int(s[13:15])
         if len(s) > 15 and s[15] == "Z":
             tzinfo = getTzid("UTC")
-    except:
+    except AllException:
         raise ParseError("'{0!s}' is not a valid DATE-TIME".format(s))
     year = year and year or 2000
     if tzinfo is not None and hasattr(tzinfo, "localize"):  # PyTZ case
@@ -1858,10 +1863,7 @@ def stringToTextValues(s, listSeparator=",", charList=None, strict=False):
     results = []
 
     while True:
-        try:
-            charIndex, char = next(charIterator)
-        except:
-            char = "eof"
+        charIndex, char = next(charIterator, (None, "eof"))
 
         if state == "read normal":
             if char == "\\":
@@ -1940,10 +1942,8 @@ def stringToDurations(s, strict=False):
     sec = 0
 
     while True:
-        try:
-            charIndex, char = next(charIterator)
-        except:
-            char = "eof"
+
+        charIndex, char = next(charIterator, (None, "eof"))
 
         if state == "start":
             if char == "+":
@@ -2035,7 +2035,7 @@ def parseDtstart(contentline, allowSignatureMismatch=False):
     elif valueParam == "DATE-TIME":
         try:
             return stringToDateTime(contentline.value, tzinfo)
-        except:
+        except AllException:
             if allowSignatureMismatch:
                 return stringToDate(contentline.value)
             else:

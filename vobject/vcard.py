@@ -3,7 +3,8 @@
 import codecs
 
 from . import behavior
-from .base import ContentLine, backslashEscape, basestring, registerBehavior, str_
+from .base import ContentLine, backslashEscape, basestring, registerBehavior
+from .exceptions import AllException
 from .icalendar import stringToTextValues
 
 # ------------------------ vCard structs ---------------------------------------
@@ -32,7 +33,7 @@ class Name(object):
     def __str__(self):
         eng_order = ("prefix", "given", "additional", "family", "suffix")
         out = " ".join(self.toString(getattr(self, val)) for val in eng_order)
-        return str_(out)
+        return out
 
     def __repr__(self):
         return "<Name: {0!s}>".format(self.__str__())
@@ -46,7 +47,7 @@ class Name(object):
                 and self.prefix == other.prefix
                 and self.suffix == other.suffix
             )
-        except:
+        except AllException:
             return False
 
 
@@ -97,7 +98,7 @@ class Address(object):
                 and self.code == other.code
                 and self.country == other.country
             )
-        except:
+        except AllException:
             return False
 
 
