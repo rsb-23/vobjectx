@@ -3,7 +3,7 @@
 import codecs
 
 from . import behavior
-from .base import ContentLine, backslashEscape, basestring, registerBehavior
+from .base import ContentLine, backslashEscape, registerBehavior
 from .exceptions import AllException
 from .icalendar import stringToTextValues
 
@@ -268,7 +268,7 @@ def splitFields(string):
 
 
 def toList(stringOrList):
-    if isinstance(stringOrList, basestring):
+    if isinstance(stringOrList, str):
         return [stringOrList]
     return stringOrList
 

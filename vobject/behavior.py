@@ -1,4 +1,5 @@
-from . import base
+from .base import Component, ContentLine, defaultSerialize
+from .exceptions import NativeError, ValidateError, VObjectError
 
 
 # ------------------------ Abstract class for behavior --------------------------
@@ -58,7 +59,7 @@ class Behavior(object):
 
     def __init__(self):
         err = "Behavior subclasses are not meant to be instantiated"
-        raise base.VObjectError(err)
+        raise VObjectError(err)
 
     @classmethod
     def validate(cls, obj, raiseException=False, complainUnrecognized=False):
@@ -77,10 +78,10 @@ class Behavior(object):
         """
         if not cls.allowGroup and obj.group is not None:
             err = "{0} has a group, but this object doesn't support groups".format(obj)
-            raise base.VObjectError(err)
-        if isinstance(obj, base.ContentLine):
+            raise VObjectError(err)
+        if isinstance(obj, ContentLine):
             return cls.lineValidate(obj, raiseException, complainUnrecognized)
-        elif isinstance(obj, base.Component):
+        elif isinstance(obj, Component):
             count = {}
             for child in obj.getChildren():
                 if not child.validate(raiseException, complainUnrecognized):
@@ -91,17 +92,17 @@ class Behavior(object):
                 if count.get(key, 0) < val[0]:
                     if raiseException:
                         m = "{0} components must contain at least {1} {2}"
-                        raise base.ValidateError(m.format(cls.name, val[0], key))
+                        raise ValidateError(m.format(cls.name, val[0], key))
                     return False
                 if val[1] and count.get(key, 0) > val[1]:
                     if raiseException:
                         m = "{0} components cannot contain more than {1} {2}"
-                        raise base.ValidateError(m.format(cls.name, val[1], key))
+                        raise ValidateError(m.format(cls.name, val[1], key))
                     return False
             return True
         else:
             err = "{0} is not a Component or Contentline".format(obj)
-            raise base.VObjectError(err)
+            raise VObjectError(err)
 
     @classmethod
     def lineValidate(cls, line, raiseException, complainUnrecognized):
@@ -134,7 +135,7 @@ class Behavior(object):
         """
         Inverse of transformToNative.
         """
-        raise base.NativeError("No transformFromNative defined")
+        raise NativeError("No transformFromNative defined")
 
     @classmethod
     def generateImplicitParameters(cls, obj):
@@ -164,7 +165,7 @@ class Behavior(object):
             transformed = obj
             undoTransform = False
 
-        out = base.defaultSerialize(transformed, buf, lineLength)
+        out = defaultSerialize(transformed, buf, lineLength)
         if undoTransform:
             obj.transformToNative()
         return out

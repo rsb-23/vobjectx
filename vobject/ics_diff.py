@@ -1,6 +1,4 @@
-from __future__ import print_function
-
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 import vobject
 
@@ -184,8 +182,30 @@ def prettyDiff(leftObj, rightObj):
         print("===============")
         if right is not None:
             right.prettyPrint()
-        print(">>>>>>>>>>>>>>>")
-        print
+        print(">>>>>>>>>>>>>>>\n")
+
+
+def getOptions():
+    # Configuration options #
+    usage = "usage: %prog [options] ics_file1 ics_file2"
+    parser = ArgumentParser(usage=usage, description="ics_diff will print a comparison of two iCalendar files ")
+    parser.add_argument("--version", action="version", version=vobject.VERSION)
+    parser.add_argument(
+        "-i",
+        "--ignore-dtstamp",
+        dest="ignore",
+        action="store_true",
+        default=False,
+        help="ignore DTSTAMP lines [default: False]",
+    )
+
+    (cmdline_options, args) = parser.parse_args()
+    if len(args) < 2:
+        print("error: too few arguments given\n")
+        print(parser.format_help())
+        return False, False
+
+    return cmdline_options, args
 
 
 def main():
@@ -199,32 +219,6 @@ def main():
         deleteExtraneous(cal1, ignore_dtstamp=ignore_dtstamp)
         deleteExtraneous(cal2, ignore_dtstamp=ignore_dtstamp)
         prettyDiff(cal1, cal2)
-
-
-def getOptions():
-    ##### Configuration options #####
-
-    usage = "usage: %prog [options] ics_file1 ics_file2"
-    parser = OptionParser(usage=usage, version=vobject.VERSION)
-    parser.set_description("ics_diff will print a comparison of two iCalendar files ")
-
-    parser.add_option(
-        "-i",
-        "--ignore-dtstamp",
-        dest="ignore",
-        action="store_true",
-        default=False,
-        help="ignore DTSTAMP lines [default: False]",
-    )
-
-    (cmdline_options, args) = parser.parse_args()
-    if len(args) < 2:
-        print("error: too few arguments given")
-        print
-        print(parser.format_help())
-        return False, False
-
-    return cmdline_options, args
 
 
 if __name__ == "__main__":

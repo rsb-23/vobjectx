@@ -1,7 +1,5 @@
 """vobject module for reading vCard and vCalendar files."""
 
-from __future__ import print_function
-
 import codecs
 import copy
 import logging
@@ -10,18 +8,7 @@ import sys
 
 import six
 
-# ------------------------------------ Python 2/3 compatibility challenges  ----
-# Python 3 no longer has a basestring type, so....
-try:
-    basestring = basestring
-except NameError:
-    basestring = (str, bytes)
-
-
-if not isinstance(b"", type("")):
-    unicode_type = str
-else:
-    unicode_type = unicode  # noqa
+from vobject.exceptions import AllException, NativeError, ParseError, VObjectError
 
 
 def to_unicode(value):
@@ -30,7 +17,7 @@ def to_unicode(value):
     If the argument is already a unicode string, it is returned
     unchanged.  Otherwise it must be a byte string and is decoded as utf8.
     """
-    if isinstance(value, unicode_type):
+    if isinstance(value, str):
         return value
 
     return value.decode("utf-8")
@@ -89,10 +76,12 @@ class VBase(object):
 
     def __init__(self, group=None, *args, **kwds):
         super(VBase, self).__init__(*args, **kwds)
+        self.name = None
         self.group = group
         self.behavior = None
         self.parentBehavior = None
         self.isNative = False
+        # self.encoded = None  # kwds.get("encoded")
 
     def copy(self, copyit):
         self.group = copyit.group
@@ -167,7 +156,7 @@ class VBase(object):
             self_orig = copy.copy(self)
             try:
                 return self.behavior.transformToNative(self)
-            except Exception as e:
+            except AllException as e:
                 # wrap errors in transformation in a ParseError
                 lineNumber = getattr(self, "lineNumber", None)
 
@@ -688,31 +677,6 @@ class Component(VBase):
                 line.prettyPrint(level + 1, tabwidth)
 
 
-class VObjectError(Exception):
-    def __init__(self, msg, lineNumber=None):
-        self.msg = msg
-        if lineNumber is not None:
-            self.lineNumber = lineNumber
-
-    def __str__(self):
-        if hasattr(self, "lineNumber"):
-            return "At line {0!s}: {1!s}".format(self.lineNumber, self.msg)
-        else:
-            return repr(self.msg)
-
-
-class ParseError(VObjectError):
-    pass
-
-
-class ValidateError(VObjectError):
-    pass
-
-
-class NativeError(VObjectError):
-    pass
-
-
 # --------- Parsing functions and parseLine regular expressions ----------------
 
 patterns = {}
@@ -981,11 +945,7 @@ def foldOneLine(outbuf, input, lineLength=75):
 
                 counter = 1  # one for space
 
-            if str is unicode_type:
-                outbuf.write(to_unicode(s))
-            else:
-                # fall back on py2 syntax
-                outbuf.write(s.encode("utf-8"))
+            outbuf.write(to_unicode(s))
 
             written += size
             counter += size
@@ -1083,7 +1043,7 @@ def readComponents(streamOrString, validate=False, transform=True, ignoreUnreada
     """
     Generate one Component at a time from a stream.
     """
-    if isinstance(streamOrString, basestring):
+    if isinstance(streamOrString, str):
         stream = six.StringIO(streamOrString)
     else:
         stream = streamOrString
@@ -1097,11 +1057,11 @@ def readComponents(streamOrString, validate=False, transform=True, ignoreUnreada
                 try:
                     vline = textLineToContentLine(line, n)
                 except VObjectError as e:
-                    if e.lineNumber is not None:
+                    if e.line_number is not None:
                         msg = "Skipped line {lineNumber}, message: {msg}"
                     else:
                         msg = "Skipped a line, message: {msg}"
-                    logger.error(msg.format(**{"lineNumber": e.lineNumber, "msg": str(e)}))
+                    logger.error(msg.format(**{"lineNumber": e.line_number, "msg": str(e)}))
                     continue
             else:
                 vline = textLineToContentLine(line, n)

@@ -1,7 +1,7 @@
 """Translate an ics file's events to a different timezone."""
 
+from argparse import ArgumentParser
 from datetime import datetime
-from optparse import OptionParser
 
 import pytz
 from dateutil import tz
@@ -69,13 +69,15 @@ def main():
 def get_options():
     # Configuration options
     usage = """usage: %prog [options] ics_file [timezone]"""
-    parser = OptionParser(usage=usage, version=vobject.VERSION)
-    parser.set_description("change_tz will convert the timezones in an ics file. ")
+    parser = ArgumentParser(usage=usage, description="change_tz will convert the timezones in an ics file. ")
+    parser.add_argument("--version", action="version", version=vobject.VERSION)
 
-    parser.add_option(
+    parser.add_argument(
         "-u", "--only-utc", dest="utc", action="store_true", default=False, help="Only change UTC events."
     )
-    parser.add_option("-l", "--list", dest="list", action="store_true", default=False, help="List available timezones")
+    parser.add_argument(
+        "-l", "--list", dest="list", action="store_true", default=False, help="List available timezones"
+    )
 
     (cmdline_options, args) = parser.parse_args()
     if not (args or cmdline_options.list):

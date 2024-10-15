@@ -15,17 +15,17 @@ def list_timezones():
     return [winreg.EnumKey(tzparent, i) for i in range(parentsize)]
 
 
-class win32tz(datetime.tzinfo):
+class Win32tz(datetime.tzinfo):
     """tzinfo class based on win32's timezones available in the registry.
 
-    >>> local = win32tz('Central Standard Time')
+    >>> local = Win32tz('Central Standard Time')
     >>> oct1 = datetime.datetime(month=10, year=2004, day=1, tzinfo=local)
     >>> dec1 = datetime.datetime(month=12, year=2004, day=1, tzinfo=local)
     >>> oct1.dst()
     datetime.timedelta(0, 3600)
     >>> dec1.dst()
     datetime.timedelta(0)
-    >>> braz = win32tz('E. South America Standard Time')
+    >>> braz = Win32tz('E. South America Standard Time')
     >>> braz.dst(oct1)
     datetime.timedelta(0)
     >>> braz.dst(dec1)
@@ -33,7 +33,7 @@ class win32tz(datetime.tzinfo):
     """
 
     def __init__(self, name):
-        self.data = win32tz_data(name)
+        self.data = Win32tzData(name)
 
     def utcoffset(self, dt):
         if self._isdst(dt):
@@ -77,7 +77,7 @@ def pickNthWeekday(year, month, dayofweek, hour, minute, whichweek):
             return dt
 
 
-class win32tz_data(object):
+class Win32tzData(object):
     """Read a registry key for a timezone, expose its contents."""
 
     def __init__(self, path):
@@ -149,9 +149,9 @@ def valuesToDict(key):
 def _test():
     import doctest
 
-    import win32tz
+    import win32tz  # pylint: disable=import-error
 
-    doctest.testmod(win32tz, verbose=0)
+    doctest.testmod(win32tz, verbose=False)
 
 
 if __name__ == "__main__":

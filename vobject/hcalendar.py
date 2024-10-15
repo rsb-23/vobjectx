@@ -77,6 +77,7 @@ class HCalendar(VCalendar2_0):
             # DTSTART
             dtstart = event.getChildValue("dtstart")
             if dtstart:
+                machine = timeformat = ""
                 if type(dtstart) is date:
                     timeformat = "%A, %B %e"
                     machine = "%Y%m%d"
