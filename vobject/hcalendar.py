@@ -30,9 +30,9 @@ and an equivalent event in hCalendar format with various elements optimized appr
 
 from datetime import date, datetime, timedelta
 
-import six
-
-from .base import CRLF, register_behavior
+from .base import register_behavior
+from .helper import Character as Char
+from .helper import get_buffer
 from .icalendar import VCalendar2_0
 
 
@@ -45,7 +45,7 @@ class HCalendar(VCalendar2_0):
         Serialize iCalendar to HTML using the hCalendar microformat (http://microformats.org/wiki/hcalendar)
         """
 
-        outbuf = buf or six.StringIO()
+        outbuf = buf or get_buffer()
         level = 0  # holds current indentation level
         tabwidth = 3
 
@@ -61,18 +61,18 @@ class HCalendar(VCalendar2_0):
         vevents = obj.vevent_list
 
         for event in vevents:
-            out('<span class="vevent">' + CRLF)
+            out('<span class="vevent">' + Char.CRLF)
             level += 1
 
             # URL
             url = event.get_child_value("url")
             if url:
-                out('<a class="url" href="' + url + '">' + CRLF)
+                out('<a class="url" href="' + url + '">' + Char.CRLF)
                 level += 1
             # SUMMARY
             summary = event.get_child_value("summary")
             if summary:
-                out('<span class="summary">' + summary + "</span>:" + CRLF)
+                out('<span class="summary">' + summary + "</span>:" + Char.CRLF)
 
             # DTSTART
             dtstart = event.get_child_value("dtstart")
@@ -117,18 +117,18 @@ class HCalendar(VCalendar2_0):
             # LOCATION
             location = event.get_child_value("location")
             if location:
-                out('at <span class="location">' + location + "</span>" + CRLF)
+                out('at <span class="location">' + location + "</span>" + Char.CRLF)
 
             description = event.get_child_value("description")
             if description:
-                out('<div class="description">' + description + "</div>" + CRLF)
+                out('<div class="description">' + description + "</div>" + Char.CRLF)
 
             if url:
                 level -= 1
-                out("</a>" + CRLF)
+                out("</a>" + Char.CRLF)
 
             level -= 1
-            out("</span>" + CRLF)  # close vevent
+            out("</span>" + Char.CRLF)  # close vevent
 
         return buf or outbuf.getvalue()
 

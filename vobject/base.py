@@ -1,15 +1,11 @@
 """vobject module for reading vCard and vCalendar files."""
 
 import codecs
-import copy
-import logging
-import re
-import sys
-from functools import lru_cache
 
-import six
-
-from vobject.exceptions import NativeError, ParseError, VObjectError
+from .exceptions import NativeError, ParseError, VObjectError
+from .helper import Character as Char
+from .helper import get_buffer, logger
+from .helper.imports_ import TextIO, contextlib, copy, lru_cache, re, sys
 
 
 def to_unicode(value):
@@ -34,25 +30,6 @@ def to_basestring(s):
         return s
 
     return s.encode("utf-8")
-
-
-# ------------------------------------ Logging ---------------------------------
-logger = logging.getLogger(__name__)
-if not logging.getLogger().handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(name)s %(levelname)s %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-logger.setLevel(logging.ERROR)  # Log errors
-DEBUG = False  # Don't waste time on debug calls
-
-# ----------------------------------- Constants --------------------------------
-CR = "\r"
-LF = "\n"
-CRLF = CR + LF
-SPACE = " "
-TAB = "\t"
-SPACEORTAB = SPACE + TAB
 
 
 # --------------------------------- Main classes -------------------------------
@@ -239,14 +216,11 @@ class VBase:
         """
         if not behavior:
             behavior = self.behavior
-
         if behavior:
-            if DEBUG:
-                logger.debug("serializing {0!s} with behavior {1!s}".format(self.name, behavior))
+            logger.debug(f"serializing {self.name!s} with behavior {behavior!s}")
             return behavior.serialize(self, buf, line_length, validate, *args, **kwargs)
         else:
-            if DEBUG:
-                logger.debug("serializing {0!s} without behavior".format(self.name))
+            logger.debug(f"serializing {self.name!s} without behavior")
             return default_serialize(self, buf, line_length)
 
 
@@ -590,12 +564,10 @@ class Component(VBase):
         """
         named = self.contents.get(obj.name.lower())
         if named:
-            try:
+            with contextlib.suppress(ValueError):
                 named.remove(obj)
                 if len(named) == 0:
                     del self.contents[obj.name.lower()]
-            except ValueError:
-                pass
 
     def get_children(self):
         """
@@ -677,14 +649,9 @@ class Component(VBase):
 
 # --------- Parsing functions and parse_line regular expressions ----------------
 
-patterns = {}
-
 # Note that underscore is not legal for names, it's included because
 # Lotus Notes uses it
-patterns["name"] = "[a-zA-Z0-9_-]+"  # 1*(ALPHA / DIGIT / "-")
-patterns["safe_char"] = '[^";:,]'
-patterns["qsafe_char"] = '[^"]'
-
+patterns = {"name": "[a-zA-Z0-9_-]+", "safe_char": '[^";:,]', "qsafe_char": '[^"]'}
 # the combined Python string replacement and regex syntax is a little confusing;
 # remember that {foobar} is replaced with patterns['foobar'], so for instance
 # param_value is any number of safe_chars or any number of qsaf_chars surrounded
@@ -753,9 +720,9 @@ def parse_params(string):
     """
     Parse parameters
     """
-    all = params_re.findall(string)
+    _all = params_re.findall(string)
     all_parameters = []
-    for tup in all:
+    for tup in _all:
         param_list = [tup[0]]  # tup looks like (name, values_string)
         for pair in param_values_re.findall(tup[1]):
             # pair looks like ('', value) or (value, '')
@@ -825,7 +792,7 @@ def get_logical_lines(fp, allow_qp=True):
     Quoted-printable data will be decoded in the Behavior decoding phase.
 
     # We're leaving this test in for awhile, because the unittest was ugly and dumb.
-    >>> from six import StringIO
+    >>> from io import StringIO
     >>> f=StringIO(test_lines)
     >>> for n, l in enumerate(get_logical_lines(f)):
     ...     print("Line %s: %s" % (n, l[0]))
@@ -848,8 +815,7 @@ def get_logical_lines(fp, allow_qp=True):
 
     else:
         quoted_printable = False
-        newbuffer = six.StringIO
-        logical_line = newbuffer()
+        logical_line = get_buffer()
         line_number = 0
         line_start_number = 0
         while True:
@@ -857,13 +823,13 @@ def get_logical_lines(fp, allow_qp=True):
             if line == "":
                 break
             else:
-                line = line.rstrip(CRLF)
+                line = line.rstrip(Char.CRLF)
                 line_number += 1
             if line.rstrip() == "":
                 if logical_line.tell() > 0:
                     yield logical_line.getvalue(), line_start_number
                 line_start_number = line_number
-                logical_line = newbuffer()
+                logical_line = get_buffer()
                 quoted_printable = False
                 continue
 
@@ -871,15 +837,15 @@ def get_logical_lines(fp, allow_qp=True):
                 logical_line.write("\n")
                 logical_line.write(line)
                 quoted_printable = False
-            elif line[0] in SPACEORTAB:
+            elif line[0] in Char.SPACEORTAB:
                 logical_line.write(line[1:])
             elif logical_line.tell() > 0:
                 yield logical_line.getvalue(), line_start_number
                 line_start_number = line_number
-                logical_line = newbuffer()
+                logical_line = get_buffer()
                 logical_line.write(line)
             else:
-                logical_line = newbuffer()
+                logical_line = get_buffer()
                 logical_line.write(line)
 
             # vCard 2.1 allows parameters to be encoded without a parameter name
@@ -908,28 +874,28 @@ def dquote_escape(param):
     return param
 
 
-def fold_one_line(outbuf, input, line_length=75):
+def fold_one_line(outbuf: TextIO, input_: str, line_length=75):
     """
     Folding line procedure that ensures multi-byte utf-8 sequences are not
     broken across lines
 
     TO-DO: This all seems odd. Is it still needed, especially in python3?
     """
-    if len(input) < line_length:
+    if len(input_) < line_length:
         # Optimize for unfolded line case
         try:
-            outbuf.write(bytes(input, "UTF-8"))
+            outbuf.write(bytes(input_, "UTF-8"))
         except Exception:
             # fall back on py2 syntax
-            outbuf.write(input)
+            outbuf.write(input_)
 
     else:
         # Look for valid utf8 range and write that out
         start = 0
         written = 0
         counter = 0  # counts line size in bytes
-        decoded = to_unicode(input)
-        length = len(to_basestring(input))
+        decoded = to_unicode(input_)
+        length = len(to_basestring(input_))
         while written < length:
             s = decoded[start]  # take one char
             size = len(to_basestring(s))  # calculate it's size in bytes
@@ -958,7 +924,7 @@ def default_serialize(obj, buf, line_length):
     """
     Encode and fold obj and its children, write to buf or return a string.
     """
-    outbuf = buf or six.StringIO()
+    outbuf = buf or get_buffer()
 
     if isinstance(obj, Component):
         if obj.group is None:
@@ -978,7 +944,7 @@ def default_serialize(obj, buf, line_length):
         if obj.behavior and not started_encoded:
             obj.behavior.encode(obj)
 
-        s = six.StringIO()
+        s = get_buffer()
 
         if obj.group is not None:
             s.write(obj.group + ".")
@@ -1041,7 +1007,7 @@ def read_components(stream_or_string, validate=False, transform=True, ignore_unr
     Generate one Component at a time from a stream.
     """
     if isinstance(stream_or_string, str):
-        stream = six.StringIO(stream_or_string)
+        stream = get_buffer(stream_or_string)
     else:
         stream = stream_or_string
 
@@ -1066,7 +1032,6 @@ def read_components(stream_or_string, validate=False, transform=True, ignore_unr
                 version_line = vline
                 stack.modify_top(vline)
             elif vline.name == "BEGIN":
-                print(vline.value, vline.group)
                 stack.push(Component(vline.value, group=vline.group))
             elif vline.name == "PROFILE":
                 if not stack.top():
@@ -1170,14 +1135,3 @@ def new_from_behavior(name, id_=None):
     obj.behavior = behavior
     obj.is_native = False
     return obj
-
-
-# --------------------------- Helper function ----------------------------------
-def backslash_escape(s):
-    s = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
-    return s.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
-
-
-@lru_cache()
-def cached_print(*x):
-    print(*x)

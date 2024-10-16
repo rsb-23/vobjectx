@@ -94,15 +94,6 @@ def diff(left, right):
 
         return output
 
-    def new_component(name, body):
-        if body is None:
-            return None
-        else:
-            c = vobject.base.Component(name)
-            c.behavior = vobject.base.get_behavior(name)
-            c.is_native = True
-            return c
-
     def process_component_pair(left_comp, right_comp):
         """
         Return None if a match, or a pair of components including UIDs and

@@ -3,8 +3,9 @@
 import codecs
 
 from . import behavior
-from .base import ContentLine, backslash_escape, register_behavior
+from .base import ContentLine, register_behavior
 from .exceptions import AllException
+from .helper import backslash_escape
 from .icalendar import string_to_text_values
 
 # ------------------------ vCard structs ---------------------------------------

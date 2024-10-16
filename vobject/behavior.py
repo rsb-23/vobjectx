@@ -54,7 +54,7 @@ class Behavior:
     has_native = False
     is_component = False
     allow_group = False
-    forceUTC = False
+    force_utc = False
     sort_first = []
 
     def __init__(self):
@@ -107,6 +107,9 @@ class Behavior:
     @classmethod
     def line_validate(cls, line, raise_exception, complain_unrecognized):
         """Examine a line's parameters and values, return True if valid."""
+        # todo: remove used param line, raise_exception, complain_unrecognized
+        if any([line, raise_exception, complain_unrecognized]):
+            pass
         return True
 
     @classmethod

@@ -1,38 +1,18 @@
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
-import base64
 import datetime as dt
 import logging
-import random  # for generating a UID
 import socket
 import string
-from functools import partial
 
-import six
+import pytz
 from dateutil import rrule, tz
 
-from .exceptions import AllException
-
-try:
-    import pytz
-except ImportError:
-
-    class Pytz:
-        """fake pytz module (pytz is not required)"""
-
-        class AmbiguousTimeError(Exception):
-            """pytz error for ambiguous times
-            during transition daylight->standard"""
-
-        class NonExistentTimeError(Exception):
-            """pytz error for non-existent times
-            during transition standard->daylight"""
-
-    pytz = Pytz  # keeps quantifiedcode happy
-
 from . import behavior
-from .base import Component, ContentLine, backslash_escape, fold_one_line, logger, register_behavior
-from .exceptions import NativeError, ParseError, ValidateError, VObjectError
+from .base import Component, ContentLine, fold_one_line, register_behavior
+from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
+from .helper import backslash_escape, get_buffer, get_random_int, logger
+from .helper.imports_ import base64, contextlib, partial
 
 # ------------------------------- Constants ------------------------------------
 DATENAMES = ("rdate", "exdate")
@@ -54,7 +34,7 @@ def to_unicode(s):
     """
     Take a string or unicode, turn it into unicode, decoding as utf-8
     """
-    if isinstance(s, six.binary_type):
+    if isinstance(s, bytes):
         s = s.decode("utf-8")
     return s
 
@@ -70,19 +50,14 @@ def get_tzid(tzid, smart=True):
     """
     Return the tzid if it exists, or None.
     """
-    tz = __tzid_map.get(to_unicode(tzid))
-    if smart and tzid and not tz:
+    _tz = __tzid_map.get(to_unicode(tzid))
+    if smart and tzid and not _tz:
         try:
-            from pytz import UnknownTimeZoneError, timezone
-
-            try:
-                tz = timezone(tzid)
-                register_tzid(to_unicode(tzid), tz)
-            except UnknownTimeZoneError as e:
-                logging.error(e)
-        except ImportError as e:
-            logging.error(e)
-    return tz
+            _tz = pytz.timezone(tzid)
+            register_tzid(to_unicode(tzid), _tz)
+        except pytz.UnknownTimeZoneError as e:
+            logger.error(e)
+    return _tz
 
 
 utc = tz.tzutc()
@@ -135,7 +110,7 @@ class TimezoneComponent(Component):
         # workaround for dateutil failing to parse some experimental properties
         good_lines = ("rdate", "rrule", "dtstart", "tzname", "tzoffsetfrom", "tzoffsetto", "tzid")
         # serialize encodes as utf-8, cStringIO will leave utf-8 alone
-        buffer = six.StringIO()
+        buffer = get_buffer()
         # allow empty VTIMEZONEs
         if len(self.contents) == 0:
             return None
@@ -348,10 +323,10 @@ class TimezoneComponent(Component):
             return to_unicode(tzinfo._tzid)
         else:
             # return tzname for standard (non-DST) time
-            notDST = dt.timedelta(0)
+            not_dst = dt.timedelta(0)
             for month in range(1, 13):
                 _dt = dt.datetime(2000, month, 1)
-                if tzinfo.dst(_dt) == notDST:
+                if tzinfo.dst(_dt) == not_dst:
                     return to_unicode(tzinfo.tzname(_dt))
         # there was no standard time in 2000!
         raise VObjectError("Unable to guess TZID for tzinfo {0!s}".format(tzinfo))
@@ -425,11 +400,11 @@ class RecurringComponent(Component):
                             dtstart = self.due.value
                         else:
                             # if there's no dtstart, just return None
-                            logging.error("failed to get dtstart with VTODO")
+                            logger.error("failed to get dtstart with VTODO")
                             return None
                     except (AttributeError, KeyError):
                         # if there's no due, just return None
-                        logging.error("failed to find DUE at all.")
+                        logger.error("failed to find DUE at all.")
                         return None
 
                 if name in DATENAMES:
@@ -554,12 +529,12 @@ class RecurringComponent(Component):
                 if name == "rdate" and dtstart in setlist:
                     setlist.remove(dtstart)
                 if is_date:
-                    setlist = [dt.date() for dt in setlist]
+                    setlist = [_dt.date() for _dt in setlist]
                 if len(setlist) > 0:
                     self.add(name).value = setlist
             elif name in RULENAMES:
                 for rule in setlist:
-                    buf = six.StringIO()
+                    buf = get_buffer()
                     buf.write("FREQ=")
                     buf.write(FREQUENCIES[rule._freq])
 
@@ -725,11 +700,10 @@ class RecurringBehavior(VCalendarComponentBehavior):
         This is just a dummy implementation, for now.
         """
         if not hasattr(obj, "uid"):
-            rand = int(random.random() * 100000)
             now = dt.datetime.now(utc)
             now = date_time_to_string(now)
             host = socket.gethostname()
-            obj.add(ContentLine("UID", [], "{0} - {1}@{2}".format(now, rand, host)))
+            obj.add(ContentLine("UID", [], "{0} - {1}@{2}".format(now, get_random_int(), host)))
 
         if not hasattr(obj, "dtstamp"):
             now = dt.datetime.now(utc)
@@ -777,8 +751,8 @@ class DateTimeBehavior(behavior.Behavior):
         if obj.is_native:
             obj.is_native = False
             tzid = TimezoneComponent.register_tzinfo(obj.value.tzinfo)
-            obj.value = date_time_to_string(obj.value, cls.forceUTC)
-            if not cls.forceUTC and tzid is not None:
+            obj.value = date_time_to_string(obj.value, cls.force_utc)
+            if not cls.force_utc and tzid is not None:
                 obj.tzid_param = tzid
             if obj.params.get("X-VOBJ-ORIGINAL-TZID"):
                 if not hasattr(obj, "tzid_param"):
@@ -793,7 +767,7 @@ class UTCDateTimeBehavior(DateTimeBehavior):
     A value which must be specified in UTC.
     """
 
-    forceUTC = True
+    force_utc = True
 
 
 class DateOrDateTimeBehavior(behavior.Behavior):
@@ -966,7 +940,7 @@ class VCalendar2_0(VCalendarComponentBehavior):
         tzids_used = {}
 
         def find_tzids(obj, table):
-            if isinstance(obj, ContentLine) and (obj.behavior is None or not obj.behavior.forceUTC):
+            if isinstance(obj, ContentLine) and (obj.behavior is None or not obj.behavior.force_utc):
                 if getattr(obj, "tzid_param", None):
                     table[obj.tzid_param] = 1
                 else:
@@ -1010,7 +984,7 @@ class VCalendar2_0(VCalendarComponentBehavior):
 
         undo_transform = bool(obj.is_native)
 
-        outbuf = buf or six.StringIO()
+        outbuf = buf or get_buffer()
         if obj.group is None:
             group_string = ""
         else:
@@ -1511,7 +1485,7 @@ class Trigger(behavior.Behavior):
     name = "TRIGGER"
     description = "This property specifies when an alarm will trigger."
     has_native = True
-    forceUTC = True
+    force_utc = True
 
     @staticmethod
     def transform_to_native(obj):
@@ -1594,10 +1568,10 @@ class PeriodBehavior(behavior.Behavior):
             obj.is_native = False
             transformed = []
             for tup in obj.value:
-                transformed.append(period_to_string(tup, cls.forceUTC))
+                transformed.append(period_to_string(tup, cls.force_utc))
             if len(transformed) > 0:
-                tzid = TimezoneComponent.register_tzinfo(tup[0].tzinfo)
-                if not cls.forceUTC and tzid is not None:
+                tzid = TimezoneComponent.register_tzinfo(tup[0].tzinfo)  # noqa # todo: check what tup does
+                if not cls.force_utc and tzid is not None:
                     obj.tzid_param = tzid
 
             obj.value = ",".join(transformed)
@@ -1611,7 +1585,7 @@ class FreeBusy(PeriodBehavior):
     """
 
     name = "FREEBUSY"
-    forceUTC = True
+    force_utc = True
 
 
 register_behavior(FreeBusy, "FREEBUSY")
@@ -1724,11 +1698,11 @@ def date_to_string(date):
     return year + month + day
 
 
-def date_time_to_string(date_time, convert_toUTC=False):
+def date_time_to_string(date_time, convert_to_utc=False):
     """
     Ignore tzinfo unless convert_toUTC.  Output string.
     """
-    if date_time.tzinfo and convert_toUTC:
+    if date_time.tzinfo and convert_to_utc:
         date_time = date_time.astimezone(utc)
 
     datestr = date_time.strftime("%Y%m%dT%H%M%S")
@@ -1763,12 +1737,12 @@ def delta_to_offset(delta):
     return sign_string + hours_string + minutes_string
 
 
-def period_to_string(period, convert_toUTC=False):
-    txtstart = date_time_to_string(period[0], convert_toUTC)
+def period_to_string(period, convert_to_utc=False):
+    txtstart = date_time_to_string(period[0], convert_to_utc)
     if isinstance(period[1], dt.timedelta):
         txtend = timedelta_to_string(period[1])
     else:
-        txtend = date_time_to_string(period[1], convert_toUTC)
+        txtend = date_time_to_string(period[1], convert_to_utc)
     return txtstart + "/" + txtend
 
 
@@ -2022,9 +1996,9 @@ def string_to_period(s, tzinfo=None):
     val_end = values[1]
     if is_duration(val_end):  # period-start = date-time "/" dur-value
         delta = string_to_durations(val_end)[0]
-        return (start, delta)
+        return start, delta
     else:
-        return (start, string_to_date_time(val_end, tzinfo))
+        return start, string_to_date_time(val_end, tzinfo)
 
 
 def get_transition(transition_to, year, tzinfo):
@@ -2032,79 +2006,69 @@ def get_transition(transition_to, year, tzinfo):
     Return the datetime of the transition to/from DST, or None.
     """
 
-    def first_transition(iter_dates, test):
+    def first_transition(iter_dates, test_func):
         """
         Return the last date not matching test, or None if all tests matched.
         """
         success = None
         for _dt in iter_dates:
-            if not test(_dt):
+            if not test_func(_dt):
                 success = _dt
             else:
                 if success is not None:
                     return success
         return success  # may be None
 
-    def generate_dates(year, month=None, day=None):
+    def generate_dates(year_, month_=None, day_=None):
         """
         Iterate over possible dates with unspecified values.
         """
         months = range(1, 13)
         days = range(1, 32)
         hours = range(0, 24)
-        if month is None:
-            for month in months:
-                yield dt.datetime(year, month, 1)
-        elif day is None:
-            for day in days:
-                try:
-                    yield dt.datetime(year, month, day)
-                except ValueError:
-                    pass
+        if month_ is None:
+            for month_ in months:
+                yield dt.datetime(year_, month_, 1)
+        elif day_ is None:
+            for day_ in days:
+                with contextlib.suppress(ValueError):
+                    yield dt.datetime(year_, month_, day_)
+
         else:
             for hour in hours:
-                yield dt.datetime(year, month, day, hour)
+                yield dt.datetime(year_, month_, day_, hour)
 
     assert transition_to in ("daylight", "standard")
-    if transition_to == "daylight":
 
-        def test(dt):
-            try:
-                return tzinfo.dst(dt) != zero_delta
-            except pytz.NonExistentTimeError:
-                return True  # entering daylight time
-            except pytz.AmbiguousTimeError:
-                return False  # entering standard time
+    def test(dt_):
+        is_standard_transition = transition_to == "standard"
+        is_daylight_transition = not is_standard_transition
+        try:
+            is_dt_zerodelta = tzinfo.dst(dt_) == zero_delta
+            return is_dt_zerodelta if is_standard_transition else not is_dt_zerodelta
+        except pytz.NonExistentTimeError:
+            return is_daylight_transition  # entering daylight time
+        except pytz.AmbiguousTimeError:
+            return is_standard_transition  # entering standard time
 
-    elif transition_to == "standard":
-
-        def test(dt):
-            try:
-                return tzinfo.dst(dt) == zero_delta
-            except pytz.NonExistentTimeError:
-                return False  # entering daylight time
-            except pytz.AmbiguousTimeError:
-                return True  # entering standard time
-
-    newyear = dt.datetime(year, 1, 1)
     month_dt = first_transition(generate_dates(year), test)
     if month_dt is None:
-        return newyear
+        return dt.datetime(year, 1, 1)  # new year
     elif month_dt.month == 12:
         return None
+
+    # there was a good transition somewhere in a non-December month
+    month = month_dt.month
+    day = first_transition(generate_dates(year, month), test).day
+    uncorrected = first_transition(generate_dates(year, month, day), test)
+    if transition_to == "standard":
+        # assuming tzinfo.dst returns a new offset for the first
+        # possible hour, we need to add one hour for the offset change
+        # and another hour because first_transition returns the hour
+        # before the transition
+        return uncorrected + dt.timedelta(hours=2)
     else:
-        # there was a good transition somewhere in a non-December month
-        month = month_dt.month
-        day = first_transition(generate_dates(year, month), test).day
-        uncorrected = first_transition(generate_dates(year, month, day), test)
-        if transition_to == "standard":
-            # assuming tzinfo.dst returns a new offset for the first
-            # possible hour, we need to add one hour for the offset change
-            # and another hour because first_transition returns the hour
-            # before the transition
-            return uncorrected + dt.timedelta(hours=2)
-        else:
-            return uncorrected + dt.timedelta(hours=1)
+        return uncorrected + dt.timedelta(hours=1)
 
 
 def tzinfo_eq(tzinfo1, tzinfo2, start_year=2000, end_year=2020):
