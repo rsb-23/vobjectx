@@ -31,7 +31,7 @@ except ImportError:
     pytz = Pytz  # keeps quantifiedcode happy
 
 from . import behavior
-from .base import Component, ContentLine, backslashEscape, foldOneLine, logger, registerBehavior
+from .base import Component, ContentLine, backslash_escape, fold_one_line, logger, register_behavior
 from .exceptions import NativeError, ParseError, ValidateError, VObjectError
 
 # ------------------------------- Constants ------------------------------------
@@ -43,14 +43,14 @@ PRODID = "-//PYVOBJECT//NONSGML Version 1//EN"
 WEEKDAYS = "MO", "TU", "WE", "TH", "FR", "SA", "SU"
 FREQUENCIES = ("YEARLY", "MONTHLY", "WEEKLY", "DAILY", "HOURLY", "MINUTELY", "SECONDLY")
 
-zeroDelta = dt.timedelta(0)
-twoHours = dt.timedelta(hours=2)
+zero_delta = dt.timedelta(0)
+two_hours = dt.timedelta(hours=2)
 
 # ---------------------------- TZID registry -----------------------------------
-__tzidMap = {}
+__tzid_map = {}
 
 
-def toUnicode(s):
+def to_unicode(s):
     """
     Take a string or unicode, turn it into unicode, decoding as utf-8
     """
@@ -59,25 +59,25 @@ def toUnicode(s):
     return s
 
 
-def registerTzid(tzid, tzinfo):
+def register_tzid(tzid, tzinfo):
     """
     Register a tzid -> tzinfo mapping.
     """
-    __tzidMap[toUnicode(tzid)] = tzinfo
+    __tzid_map[to_unicode(tzid)] = tzinfo
 
 
-def getTzid(tzid, smart=True):
+def get_tzid(tzid, smart=True):
     """
     Return the tzid if it exists, or None.
     """
-    tz = __tzidMap.get(toUnicode(tzid))
+    tz = __tzid_map.get(to_unicode(tzid))
     if smart and tzid and not tz:
         try:
             from pytz import UnknownTimeZoneError, timezone
 
             try:
                 tz = timezone(tzid)
-                registerTzid(toUnicode(tzid), tz)
+                register_tzid(to_unicode(tzid), tz)
             except UnknownTimeZoneError as e:
                 logging.error(e)
         except ImportError as e:
@@ -86,7 +86,7 @@ def getTzid(tzid, smart=True):
 
 
 utc = tz.tzutc()
-registerTzid("UTC", utc)
+register_tzid("UTC", utc)
 
 
 # -------------------- Helper subclasses ---------------------------------------
@@ -111,7 +111,7 @@ class TimezoneComponent(Component):
         Accept an existing Component or a tzinfo class.
         """
         super(TimezoneComponent, self).__init__(*args, **kwds)
-        self.isNative = True
+        self.is_native = True
         # hack to make sure a behavior is assigned
         if self.behavior is None:
             self.behavior = VTimezone
@@ -119,16 +119,16 @@ class TimezoneComponent(Component):
             self.tzinfo = tzinfo
         if not hasattr(self, "name") or self.name == "":
             self.name = "VTIMEZONE"
-            self.useBegin = True
+            self.use_begin = True
 
     @classmethod
-    def registerTzinfo(cls, tzinfo):
+    def register_tzinfo(cls, tzinfo):
         """
         Register tzinfo if it's not already registered, return its tzid.
         """
-        tzid = cls.pickTzid(tzinfo)
-        if tzid and not getTzid(tzid, False):
-            registerTzid(tzid, tzinfo)
+        tzid = cls.pick_tzid(tzinfo)
+        if tzid and not get_tzid(tzid, False):
+            register_tzid(tzid, tzinfo)
         return tzid
 
     def gettzinfo(self):
@@ -140,17 +140,17 @@ class TimezoneComponent(Component):
         if len(self.contents) == 0:
             return None
 
-        def customSerialize(obj):
+        def custom_serialize(obj):
             if isinstance(obj, Component):
-                foldOneLine(buffer, "BEGIN:" + obj.name)
+                fold_one_line(buffer, "BEGIN:" + obj.name)
                 for child in obj.lines():
                     if child.name.lower() in good_lines:
                         child.serialize(buffer, 75, validate=False)
                 for comp in obj.components():
-                    customSerialize(comp)
-                foldOneLine(buffer, "END:" + obj.name)
+                    custom_serialize(comp)
+                fold_one_line(buffer, "END:" + obj.name)
 
-        customSerialize(self)
+        custom_serialize(self)
         buffer.seek(0)  # tzical wants to read a stream
         return tz.tzical(buffer).get()
 
@@ -170,16 +170,16 @@ class TimezoneComponent(Component):
           offset as being in the later regime
         """
 
-        def fromLastWeek(dt_):
+        def from_last_week(dt_):
             """
             How many weeks from the end of the month dt is, starting from 1.
             """
-            weekDelta = dt.timedelta(weeks=1)
+            week_delta = dt.timedelta(weeks=1)
             n = 1
-            current = dt_ + weekDelta
+            current = dt_ + week_delta
             while current.month == dt_.month:
                 n += 1
-                current += weekDelta
+                current += week_delta
             return n
 
         # lists of dictionaries defining rules which are no longer in effect
@@ -191,12 +191,12 @@ class TimezoneComponent(Component):
         # rule may be based on nth week of the month or the nth from the last
         for year in range(start, end + 1):
             newyear = dt.datetime(year, 1, 1)
-            for transitionTo in "daylight", "standard":
-                transition = getTransition(transitionTo, year, tzinfo)
-                oldrule = working[transitionTo]
+            for transition_to in "daylight", "standard":
+                transition = get_transition(transition_to, year, tzinfo)
+                oldrule = working[transition_to]
 
                 if transition == newyear:
-                    # transitionTo is in effect for the whole year
+                    # transition_to is in effect for the whole year
                     rule = {
                         "end": None,
                         "start": newyear,
@@ -210,32 +210,32 @@ class TimezoneComponent(Component):
                         "offsetfrom": tzinfo.utcoffset(newyear),
                     }
                     if oldrule is None:
-                        # transitionTo was not yet in effect
-                        working[transitionTo] = rule
+                        # transition_to was not yet in effect
+                        working[transition_to] = rule
                     else:
-                        # transitionTo was already in effect
+                        # transition_to was already in effect
                         if oldrule["offset"] != tzinfo.utcoffset(newyear):
                             # old rule was different, it shouldn't continue
                             oldrule["end"] = year - 1
-                            completed[transitionTo].append(oldrule)
-                            working[transitionTo] = rule
+                            completed[transition_to].append(oldrule)
+                            working[transition_to] = rule
                 elif transition is None:
-                    # transitionTo is not in effect
+                    # transition_to is not in effect
                     if oldrule is not None:
-                        # transitionTo used to be in effect
+                        # transition_to used to be in effect
                         oldrule["end"] = year - 1
-                        completed[transitionTo].append(oldrule)
-                        working[transitionTo] = None
+                        completed[transition_to].append(oldrule)
+                        working[transition_to] = None
                 else:
                     # an offset transition was found
                     try:
-                        old_offset = tzinfo.utcoffset(transition - twoHours)
+                        old_offset = tzinfo.utcoffset(transition - two_hours)
                         name = tzinfo.tzname(transition)
                         offset = tzinfo.utcoffset(transition)
                     except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
                         # guaranteed that tzinfo is a pytz timezone
-                        is_dst = transitionTo == "daylight"
-                        old_offset = tzinfo.utcoffset(transition - twoHours, is_dst=is_dst)
+                        is_dst = transition_to == "daylight"
+                        old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
                         name = tzinfo.tzname(transition, is_dst=is_dst)
                         offset = tzinfo.utcoffset(transition, is_dst=is_dst)
                     rule = {
@@ -246,53 +246,53 @@ class TimezoneComponent(Component):
                         "hour": transition.hour,
                         "name": name,
                         "plus": int((transition.day - 1) / 7 + 1),  # nth week of the month
-                        "minus": fromLastWeek(transition),  # nth from last week
+                        "minus": from_last_week(transition),  # nth from last week
                         "offset": offset,
                         "offsetfrom": old_offset,
                     }
 
                     if oldrule is None:
-                        working[transitionTo] = rule
+                        working[transition_to] = rule
                     else:
-                        plusMatch = rule["plus"] == oldrule["plus"]
-                        minusMatch = rule["minus"] == oldrule["minus"]
-                        truth = plusMatch or minusMatch
+                        plus_match = rule["plus"] == oldrule["plus"]
+                        minus_match = rule["minus"] == oldrule["minus"]
+                        truth = plus_match or minus_match
                         for key in "month", "weekday", "hour", "offset":
                             truth = truth and rule[key] == oldrule[key]
                         if truth:
                             # the old rule is still true, limit to plus or minus
-                            if not plusMatch:
+                            if not plus_match:
                                 oldrule["plus"] = None
-                            if not minusMatch:
+                            if not minus_match:
                                 oldrule["minus"] = None
                         else:
                             # the new rule did not match the old
                             oldrule["end"] = year - 1
-                            completed[transitionTo].append(oldrule)
-                            working[transitionTo] = rule
+                            completed[transition_to].append(oldrule)
+                            working[transition_to] = rule
 
-        for transitionTo in "daylight", "standard":
-            if working[transitionTo] is not None:
-                completed[transitionTo].append(working[transitionTo])
+        for transition_to in "daylight", "standard":
+            if working[transition_to] is not None:
+                completed[transition_to].append(working[transition_to])
 
-        self.tzid = []
-        self.daylight = []
-        self.standard = []
+        self.contents.tzid = []
+        self.contents.daylight = []
+        self.contents.standard = []
 
-        self.add("tzid").value = self.pickTzid(tzinfo, True)
+        self.add("tzid").value = self.pick_tzid(tzinfo, True)
 
         # old = None # unused?
-        for transitionTo in "daylight", "standard":
-            for rule in completed[transitionTo]:
-                comp = self.add(transitionTo)
+        for transition_to in "daylight", "standard":
+            for rule in completed[transition_to]:
+                comp = self.add(transition_to)
                 dtstart = comp.add("dtstart")
                 dtstart.value = rule["start"]
                 if rule["name"] is not None:
                     comp.add("tzname").value = rule["name"]
                 line = comp.add("tzoffsetto")
-                line.value = deltaToOffset(rule["offset"])
+                line.value = delta_to_offset(rule["offset"])
                 line = comp.add("tzoffsetfrom")
-                line.value = deltaToOffset(rule["offsetfrom"])
+                line.value = delta_to_offset(rule["offsetfrom"])
 
                 if rule["plus"] is not None:
                     num = rule["plus"]
@@ -301,13 +301,13 @@ class TimezoneComponent(Component):
                 else:
                     num = None
                 if num is not None:
-                    dayString = ";BYDAY=" + str(num) + WEEKDAYS[rule["weekday"]]
+                    day_string = ";BYDAY=" + str(num) + WEEKDAYS[rule["weekday"]]
                 else:
-                    dayString = ""
+                    day_string = ""
                 if rule["end"] is not None:
                     if rule["hour"] is None:
                         # all year offset, with no rule
-                        endDate = dt.datetime(rule["end"], 1, 1)
+                        end_date = dt.datetime(rule["end"], 1, 1)
                     else:
                         weekday = rrule.weekday(rule["weekday"], num)
                         du_rule = rrule.rrule(
@@ -316,45 +316,43 @@ class TimezoneComponent(Component):
                             byweekday=weekday,
                             dtstart=dt.datetime(rule["end"], 1, 1, rule["hour"]),
                         )
-                        endDate = du_rule[0]
-                    endDate = endDate.replace(tzinfo=utc) - rule["offsetfrom"]
-                    endString = ";UNTIL=" + dateTimeToString(endDate)
+                        end_date = du_rule[0]
+                    end_date = end_date.replace(tzinfo=utc) - rule["offsetfrom"]
+                    end_string = ";UNTIL=" + date_time_to_string(end_date)
                 else:
-                    endString = ""
-                new_rule = "FREQ=YEARLY{0!s};BYMONTH={1!s}{2!s}".format(dayString, rule["month"], endString)
+                    end_string = ""
+                new_rule = "FREQ=YEARLY{0!s};BYMONTH={1!s}{2!s}".format(day_string, rule["month"], end_string)
 
                 comp.add("rrule").value = new_rule
 
     tzinfo = property(gettzinfo, settzinfo)
-    # prevent Component's __setattr__ from overriding the tzinfo property
-    normal_attributes = Component.normal_attributes + ["tzinfo"]
 
     @staticmethod
-    def pickTzid(tzinfo, allowUTC=False):
+    def pick_tzid(tzinfo, allow_utc=False):
         """
         Given a tzinfo class, use known APIs to determine TZID, or use tzname.
         """
-        if tzinfo is None or (not allowUTC and tzinfo_eq(tzinfo, utc)):
+        if tzinfo is None or (not allow_utc and tzinfo_eq(tzinfo, utc)):
             # If tzinfo is UTC, we don't need a TZID
             return None
         # try Pytz's tzid key
         if hasattr(tzinfo, "tzid"):
-            return toUnicode(tzinfo.tzid)
+            return to_unicode(tzinfo.tzid)
 
         # try pytz zone key
         if hasattr(tzinfo, "zone"):
-            return toUnicode(tzinfo.zone)
+            return to_unicode(tzinfo.zone)
 
         # try tzical's tzid key
         elif hasattr(tzinfo, "_tzid"):
-            return toUnicode(tzinfo._tzid)
+            return to_unicode(tzinfo._tzid)
         else:
             # return tzname for standard (non-DST) time
             notDST = dt.timedelta(0)
             for month in range(1, 13):
                 _dt = dt.datetime(2000, month, 1)
                 if tzinfo.dst(_dt) == notDST:
-                    return toUnicode(tzinfo.tzname(_dt))
+                    return to_unicode(tzinfo.tzname(_dt))
         # there was no standard time in 2000!
         raise VObjectError("Unable to guess TZID for tzinfo {0!s}".format(tzinfo))
 
@@ -364,7 +362,7 @@ class TimezoneComponent(Component):
     def __repr__(self):
         return self.__str__()
 
-    def prettyPrint(self, level=0, tabwidth=3):
+    def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
         print(pre, self.name)
         print(pre, "TZID:", self.tzid)
@@ -394,9 +392,9 @@ class RecurringComponent(Component):
     def __init__(self, *args, **kwds):
         super(RecurringComponent, self).__init__(*args, **kwds)
 
-        self.isNative = True
+        self.is_native = True
 
-    def getrruleset(self, addRDate=False):
+    def getrruleset(self, add_rdate=False):
         """
         Get an rruleset created from self.
 
@@ -457,7 +455,7 @@ class RecurringComponent(Component):
                         # of dtstart
                         if ignoretz:
                             raise
-                        utc_now = dt.dt.now(dt.timezone.utc)
+                        utc_now = dt.datetime.now(dt.timezone.utc)
                         until = rrule.rrulestr(value, dtstart=utc_now)._until
 
                     if until is not None and isinstance(dtstart, dt.datetime) and (until.tzinfo != dtstart.tzinfo):
@@ -501,7 +499,7 @@ class RecurringComponent(Component):
                     # add the rrule or exrule to the rruleset
                     addfunc(rule)
 
-                if (name == "rrule" or name == "rdate") and addRDate:
+                if (name == "rrule" or name == "rdate") and add_rdate:
                     # rlist = rruleset._rrule if name == 'rrule' else rruleset._rdate
                     try:
                         # dateutils does not work with all-day
@@ -539,13 +537,13 @@ class RecurringComponent(Component):
             else:
                 raise
 
-        isDate = dt.date == type(dtstart)
-        if isDate:
+        is_date = dt.date == type(dtstart)
+        if is_date:
             dtstart = dt.datetime(dtstart.year, dtstart.month, dtstart.day)
-            untilSerialize = dateToString
+            until_serialize = date_to_string
         else:
             # make sure to convert time zones to UTC
-            untilSerialize = partial(datetime_to_string, convert_to_utc=True)
+            until_serialize = partial(datetime_to_string, convert_to_utc=True)
 
         for name in DATESANDRULES:
             if name in self.contents:
@@ -555,7 +553,7 @@ class RecurringComponent(Component):
                 setlist = list(setlist)  # make a copy of the list
                 if name == "rdate" and dtstart in setlist:
                     setlist.remove(dtstart)
-                if isDate:
+                if is_date:
                     setlist = [dt.date() for dt in setlist]
                 if len(setlist) > 0:
                     self.add(name).value = setlist
@@ -577,7 +575,7 @@ class RecurringComponent(Component):
                     if rule._count is not None:
                         values["COUNT"] = [str(rule._count)]
                     elif rule._until is not None:
-                        values["UNTIL"] = [untilSerialize(rule._until)]
+                        values["UNTIL"] = [until_serialize(rule._until)]
 
                     days = []
                     if rule._byweekday is not None and (
@@ -673,7 +671,7 @@ class TextBehavior(behavior.Behavior):
             if encoding and encoding.upper() == cls.base64string:
                 line.value = base64.b64decode(line.value)
             else:
-                line.value = stringToTextValues(line.value)[0]
+                line.value = string_to_text_values(line.value)[0]
             line.encoded = False
 
     @classmethod
@@ -686,13 +684,13 @@ class TextBehavior(behavior.Behavior):
             if encoding and encoding.upper() == cls.base64string:
                 line.value = base64.b64encode(line.value.encode("utf-8")).decode("utf-8").replace("\n", "")
             else:
-                line.value = backslashEscape(line.value)
+                line.value = backslash_escape(line.value)
             line.encoded = True
 
 
 class VCalendarComponentBehavior(behavior.Behavior):
-    defaultBehavior = TextBehavior
-    isComponent = True
+    default_behavior = TextBehavior
+    is_component = True
 
 
 class RecurringBehavior(VCalendarComponentBehavior):
@@ -700,27 +698,27 @@ class RecurringBehavior(VCalendarComponentBehavior):
     Parent Behavior for components which should be RecurringComponents.
     """
 
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn a recurring Component into a RecurringComponent.
         """
-        if not obj.isNative:
+        if not obj.is_native:
             object.__setattr__(obj, "__class__", RecurringComponent)
-            obj.isNative = True
+            obj.is_native = True
         return obj
 
     @staticmethod
-    def transformFromNative(obj):
-        if obj.isNative:
+    def transform_from_native(obj):
+        if obj.is_native:
             object.__setattr__(obj, "__class__", Component)
-            obj.isNative = False
+            obj.is_native = False
         return obj
 
     @staticmethod
-    def generateImplicitParameters(obj):
+    def generate_implicit_parameters(obj):
         """
         Generate a UID and DTSTAMP if one does not exist.
 
@@ -729,7 +727,7 @@ class RecurringBehavior(VCalendarComponentBehavior):
         if not hasattr(obj, "uid"):
             rand = int(random.random() * 100000)
             now = dt.datetime.now(utc)
-            now = dateTimeToString(now)
+            now = date_time_to_string(now)
             host = socket.gethostname()
             obj.add(ContentLine("UID", [], "{0} - {1}@{2}".format(now, rand, host)))
 
@@ -743,10 +741,10 @@ class DateTimeBehavior(behavior.Behavior):
     Parent Behavior for ContentLines containing one DATE-TIME.
     """
 
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn obj.value into a dt.
 
@@ -755,14 +753,14 @@ class DateTimeBehavior(behavior.Behavior):
         a file, real floating times are noted by setting to 'TRUE' the
         X-VOBJ-FLOATINGTIME-ALLOWED parameter.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
-        obj.isNative = True
+        obj.is_native = True
         if obj.value == "":
             return obj
         obj.value = obj.value
-        # we're cheating a little here, parseDtstart allows DATE
-        obj.value = parseDtstart(obj)
+        # we're cheating a little here, parse_dtstart allows DATE
+        obj.value = parse_dtstart(obj)
         if obj.value.tzinfo is None:
             obj.params["X-VOBJ-FLOATINGTIME-ALLOWED"] = ["TRUE"]
         if obj.params.get("TZID"):
@@ -772,14 +770,14 @@ class DateTimeBehavior(behavior.Behavior):
         return obj
 
     @classmethod
-    def transformFromNative(cls, obj):
+    def transform_from_native(cls, obj):
         """
         Replace the datetime in obj.value with an ISO 8601 string.
         """
-        if obj.isNative:
-            obj.isNative = False
-            tzid = TimezoneComponent.registerTzinfo(obj.value.tzinfo)
-            obj.value = dateTimeToString(obj.value, cls.forceUTC)
+        if obj.is_native:
+            obj.is_native = False
+            tzid = TimezoneComponent.register_tzinfo(obj.value.tzinfo)
+            obj.value = date_time_to_string(obj.value, cls.forceUTC)
             if not cls.forceUTC and tzid is not None:
                 obj.tzid_param = tzid
             if obj.params.get("X-VOBJ-ORIGINAL-TZID"):
@@ -803,20 +801,20 @@ class DateOrDateTimeBehavior(behavior.Behavior):
     Parent Behavior for ContentLines containing one DATE or DATE-TIME.
     """
 
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn obj.value into a date or dt.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
-        obj.isNative = True
+        obj.is_native = True
         if obj.value == "":
             return obj
         obj.value = obj.value
-        obj.value = parseDtstart(obj, allowSignatureMismatch=True)
+        obj.value = parse_dtstart(obj, allow_signature_mismatch=True)
         if getattr(obj, "value_param", "DATE-TIME").upper() == "DATE-TIME" and hasattr(obj, "tzid_param"):
             # Keep a copy of the original TZID around
             obj.params["X-VOBJ-ORIGINAL-TZID"] = [obj.tzid_param]
@@ -824,17 +822,17 @@ class DateOrDateTimeBehavior(behavior.Behavior):
         return obj
 
     @staticmethod
-    def transformFromNative(obj):
+    def transform_from_native(obj):
         """
         Replace the date or datetime in obj.value with an ISO 8601 string.
         """
         if type(obj.value) is dt.date:
-            obj.isNative = False
+            obj.is_native = False
             obj.value_param = "DATE"
-            obj.value = dateToString(obj.value)
+            obj.value = date_to_string(obj.value)
             return obj
         else:
-            return DateTimeBehavior.transformFromNative(obj)
+            return DateTimeBehavior.transform_from_native(obj)
 
 
 class MultiDateBehavior(behavior.Behavior):
@@ -843,54 +841,54 @@ class MultiDateBehavior(behavior.Behavior):
     PERIOD.
     """
 
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn obj.value into a list of dates, datetimes, or
         (datetime, timedelta) tuples.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
-        obj.isNative = True
+        obj.is_native = True
         if obj.value == "":
             obj.value = []
             return obj
-        tzinfo = getTzid(getattr(obj, "tzid_param", None))
-        valueParam = getattr(obj, "value_param", "DATE-TIME").upper()
-        valTexts = obj.value.split(",")
-        if valueParam == "DATE":
-            obj.value = [stringToDate(x) for x in valTexts]
-        elif valueParam == "DATE-TIME":
-            obj.value = [stringToDateTime(x, tzinfo) for x in valTexts]
-        elif valueParam == "PERIOD":
-            obj.value = [stringToPeriod(x, tzinfo) for x in valTexts]
+        tzinfo = get_tzid(getattr(obj, "tzid_param", None))
+        value_param = getattr(obj, "value_param", "DATE-TIME").upper()
+        val_texts = obj.value.split(",")
+        if value_param == "DATE":
+            obj.value = [string_to_date(x) for x in val_texts]
+        elif value_param == "DATE-TIME":
+            obj.value = [string_to_date_time(x, tzinfo) for x in val_texts]
+        elif value_param == "PERIOD":
+            obj.value = [string_to_period(x, tzinfo) for x in val_texts]
         return obj
 
     @staticmethod
-    def transformFromNative(obj):
+    def transform_from_native(obj):
         """
         Replace the date, datetime or period tuples in obj.value with
         appropriate strings.
         """
         if obj.value and type(obj.value[0]) is dt.date:
-            obj.isNative = False
+            obj.is_native = False
             obj.value_param = "DATE"
-            obj.value = ",".join([dateToString(val) for val in obj.value])
+            obj.value = ",".join([date_to_string(val) for val in obj.value])
             return obj
         # Fixme: handle PERIOD case
         else:
-            if obj.isNative:
-                obj.isNative = False
+            if obj.is_native:
+                obj.is_native = False
                 transformed = []
                 tzid = None
                 for val in obj.value:
                     if tzid is None and type(val) is dt.datetime:
-                        tzid = TimezoneComponent.registerTzinfo(val.tzinfo)
+                        tzid = TimezoneComponent.register_tzinfo(val.tzinfo)
                         if tzid is not None:
                             obj.tzid_param = tzid
-                    transformed.append(dateTimeToString(val))
+                    transformed.append(date_time_to_string(val))
                 obj.value = ",".join(transformed)
             return obj
 
@@ -902,7 +900,7 @@ class MultiTextBehavior(behavior.Behavior):
     After transformation, value is a list of strings.
     """
 
-    listSeparator = ","
+    list_separator = ","
 
     @classmethod
     def decode(cls, line):
@@ -910,7 +908,7 @@ class MultiTextBehavior(behavior.Behavior):
         Remove backslash escaping from line.value, then split on commas.
         """
         if line.encoded:
-            line.value = stringToTextValues(line.value, listSeparator=cls.listSeparator)
+            line.value = string_to_text_values(line.value, list_separator=cls.list_separator)
             line.encoded = False
 
     @classmethod
@@ -919,12 +917,12 @@ class MultiTextBehavior(behavior.Behavior):
         Backslash escape line.value.
         """
         if not line.encoded:
-            line.value = cls.listSeparator.join(backslashEscape(val) for val in line.value)
+            line.value = cls.list_separator.join(backslash_escape(val) for val in line.value)
             line.encoded = True
 
 
 class SemicolonMultiTextBehavior(MultiTextBehavior):
-    listSeparator = ";"
+    list_separator = ";"
 
 
 # ------------------------ Registered Behavior subclasses ----------------------
@@ -935,10 +933,10 @@ class VCalendar2_0(VCalendarComponentBehavior):
 
     name = "VCALENDAR"
     description = "vCalendar 2.0, also known as iCalendar."
-    versionString = "2.0"
-    sortFirst = ("version", "calscale", "method", "prodid", "vtimezone")
-    knownChildren = {
-        "CALSCALE": (0, 1, None),  # min, max, behaviorRegistry id
+    version_string = "2.0"
+    sort_first = ("version", "calscale", "method", "prodid", "vtimezone")
+    known_children = {
+        "CALSCALE": (0, 1, None),  # min, max, behavior_registry id
         "METHOD": (0, 1, None),
         "VERSION": (0, 1, None),  # required, but auto-generated
         "PRODID": (1, 1, None),
@@ -951,7 +949,7 @@ class VCalendar2_0(VCalendarComponentBehavior):
     }
 
     @classmethod
-    def generateImplicitParameters(cls, obj):
+    def generate_implicit_parameters(cls, obj):
         """
         Create PRODID, VERSION and VTIMEZONEs if needed.
 
@@ -960,14 +958,14 @@ class VCalendar2_0(VCalendarComponentBehavior):
         """
         for comp in obj.components():
             if comp.behavior is not None:
-                comp.behavior.generateImplicitParameters(comp)
+                comp.behavior.generate_implicit_parameters(comp)
         if not hasattr(obj, "prodid"):
             obj.add(ContentLine("PRODID", [], PRODID))
         if not hasattr(obj, "version"):
-            obj.add(ContentLine("VERSION", [], cls.versionString))
-        tzidsUsed = {}
+            obj.add(ContentLine("VERSION", [], cls.version_string))
+        tzids_used = {}
 
-        def findTzids(obj, table):
+        def find_tzids(obj, table):
             if isinstance(obj, ContentLine) and (obj.behavior is None or not obj.behavior.forceUTC):
                 if getattr(obj, "tzid_param", None):
                     table[obj.tzid_param] = 1
@@ -975,57 +973,57 @@ class VCalendar2_0(VCalendarComponentBehavior):
                     if type(obj.value) is list:
                         for _ in obj.value:
                             tzinfo = getattr(obj.value, "tzinfo", None)
-                            tzid = TimezoneComponent.registerTzinfo(tzinfo)
+                            tzid = TimezoneComponent.register_tzinfo(tzinfo)
                             if tzid:
                                 table[tzid] = 1
                     else:
                         tzinfo = getattr(obj.value, "tzinfo", None)
-                        tzid = TimezoneComponent.registerTzinfo(tzinfo)
+                        tzid = TimezoneComponent.register_tzinfo(tzinfo)
                         if tzid:
                             table[tzid] = 1
-            for child in obj.getChildren():
+            for child in obj.get_children():
                 if obj.name != "VTIMEZONE":
-                    findTzids(child, table)
+                    find_tzids(child, table)
 
-        findTzids(obj, tzidsUsed)
-        oldtzids = [toUnicode(x.tzid.value) for x in getattr(obj, "vtimezone_list", [])]
-        for tzid in tzidsUsed.keys():
-            tzid = toUnicode(tzid)
+        find_tzids(obj, tzids_used)
+        oldtzids = [to_unicode(x.tzid.value) for x in getattr(obj, "vtimezone_list", [])]
+        for tzid in tzids_used.keys():
+            tzid = to_unicode(tzid)
             if tzid != "UTC" and tzid not in oldtzids:
-                obj.add(TimezoneComponent(tzinfo=getTzid(tzid)))
+                obj.add(TimezoneComponent(tzinfo=get_tzid(tzid)))
 
     @classmethod
-    def serialize(cls, obj, buf, lineLength, validate=True):
+    def serialize(cls, obj, buf, line_length, validate=True):
         """
         Set implicit parameters, do encoding, return unicode string.
 
         If validate is True, raise VObjectError if the line doesn't validate
         after implicit parameters are generated.
 
-        Default is to call base.defaultSerialize.
+        Default is to call base.default_serialize.
 
         """
 
-        cls.generateImplicitParameters(obj)
+        cls.generate_implicit_parameters(obj)
         if validate:
-            cls.validate(obj, raiseException=True)
+            cls.validate(obj, raise_exception=True)
 
-        undoTransform = bool(obj.isNative)
+        undo_transform = bool(obj.is_native)
 
         outbuf = buf or six.StringIO()
         if obj.group is None:
-            groupString = ""
+            group_string = ""
         else:
-            groupString = obj.group + "."
-        if obj.useBegin:
-            foldOneLine(outbuf, "{0}BEGIN:{1}".format(groupString, obj.name), lineLength)
+            group_string = obj.group + "."
+        if obj.use_begin:
+            fold_one_line(outbuf, "{0}BEGIN:{1}".format(group_string, obj.name), line_length)
 
         try:
             first_props = [
-                s for s in cls.sortFirst if s in obj.contents and not isinstance(obj.contents[s][0], Component)
+                s for s in cls.sort_first if s in obj.contents and not isinstance(obj.contents[s][0], Component)
             ]
             first_components = [
-                s for s in cls.sortFirst if s in obj.contents and isinstance(obj.contents[s][0], Component)
+                s for s in cls.sort_first if s in obj.contents and isinstance(obj.contents[s][0], Component)
             ]
         except AllException:
             first_props = first_components = []
@@ -1049,16 +1047,16 @@ class VCalendar2_0(VCalendarComponentBehavior):
 
         for child in children:
             # validate is recursive, we only need to validate once
-            child.serialize(outbuf, lineLength, validate=False)
-        if obj.useBegin:
-            foldOneLine(outbuf, "{0}END:{1}".format(groupString, obj.name), lineLength)
+            child.serialize(outbuf, line_length, validate=False)
+        if obj.use_begin:
+            fold_one_line(outbuf, "{0}END:{1}".format(group_string, obj.name), line_length)
         out = buf or outbuf.getvalue()
-        if undoTransform:
-            obj.transformToNative()
+        if undo_transform:
+            obj.transform_to_native()
         return out
 
 
-registerBehavior(VCalendar2_0)
+register_behavior(VCalendar2_0)
 
 
 class VTimezone(VCalendarComponentBehavior):
@@ -1067,11 +1065,11 @@ class VTimezone(VCalendarComponentBehavior):
     """
 
     name = "VTIMEZONE"
-    hasNative = True
+    has_native = True
     description = "A grouping of component properties that defines a time zone."
-    sortFirst = ("tzid", "last-modified", "tzurl", "standard", "daylight")
-    knownChildren = {
-        "TZID": (1, 1, None),  # min, max, behaviorRegistry id
+    sort_first = ("tzid", "last-modified", "tzurl", "standard", "daylight")
+    known_children = {
+        "TZID": (1, 1, None),  # min, max, behavior_registry id
         "LAST-MODIFIED": (0, 1, None),
         "TZURL": (0, 1, None),
         "STANDARD": (0, None, None),  # NOTE: One of Standard or
@@ -1079,35 +1077,35 @@ class VTimezone(VCalendarComponentBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         if not hasattr(obj, "tzid") or obj.tzid.value is None:
-            if raiseException:
+            if raise_exception:
                 m = "VTIMEZONE components must contain a valid TZID"
                 raise ValidateError(m)
             return False
         if "standard" in obj.contents or "daylight" in obj.contents:
-            return super(VTimezone, cls).validate(obj, raiseException, *args)
+            return super(VTimezone, cls).validate(obj, raise_exception, *args)
         else:
-            if raiseException:
+            if raise_exception:
                 m = "VTIMEZONE components must contain a STANDARD or a DAYLIGHT\
                      component"
                 raise ValidateError(m)
             return False
 
     @staticmethod
-    def transformToNative(obj):
-        if not obj.isNative:
+    def transform_to_native(obj):
+        if not obj.is_native:
             object.__setattr__(obj, "__class__", TimezoneComponent)
-            obj.isNative = True
-            obj.registerTzinfo(obj.tzinfo)
+            obj.is_native = True
+            obj.register_tzinfo(obj.tzinfo)
         return obj
 
     @staticmethod
-    def transformFromNative(obj):
+    def transform_from_native(obj):
         return obj
 
 
-registerBehavior(VTimezone)
+register_behavior(VTimezone)
 
 
 class TZID(behavior.Behavior):
@@ -1122,16 +1120,16 @@ class TZID(behavior.Behavior):
     """
 
 
-registerBehavior(TZID)
+register_behavior(TZID)
 
 
 class DaylightOrStandard(VCalendarComponentBehavior):
-    hasNative = False
-    knownChildren = {"DTSTART": (1, 1, None), "RRULE": (0, 1, None)}  # min, max, behaviorRegistry id
+    has_native = False
+    known_children = {"DTSTART": (1, 1, None), "RRULE": (0, 1, None)}  # min, max, behavior_registry id
 
 
-registerBehavior(DaylightOrStandard, "STANDARD")
-registerBehavior(DaylightOrStandard, "DAYLIGHT")
+register_behavior(DaylightOrStandard, "STANDARD")
+register_behavior(DaylightOrStandard, "DAYLIGHT")
 
 
 class VEvent(RecurringBehavior):
@@ -1140,13 +1138,13 @@ class VEvent(RecurringBehavior):
     """
 
     name = "VEVENT"
-    sortFirst = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
 
     description = 'A grouping of component properties, and possibly including \
                    "VALARM" calendar components, that represents a scheduled \
                    amount of time on a calendar.'
-    knownChildren = {
-        "DTSTART": (0, 1, None),  # min, max, behaviorRegistry id
+    known_children = {
+        "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CLASS": (0, 1, None),
         "CREATED": (0, 1, None),
         "DESCRIPTION": (0, 1, None),
@@ -1181,18 +1179,18 @@ class VEvent(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         if "dtend" in obj.contents and "duration" in obj.contents:
-            if raiseException:
+            if raise_exception:
                 m = "VEVENT components cannot contain both DTEND and DURATION\
                      components"
                 raise ValidateError(m)
             return False
         else:
-            return super(VEvent, cls).validate(obj, raiseException, *args)
+            return super(VEvent, cls).validate(obj, raise_exception, *args)
 
 
-registerBehavior(VEvent)
+register_behavior(VEvent)
 
 
 class VTodo(RecurringBehavior):
@@ -1204,8 +1202,8 @@ class VTodo(RecurringBehavior):
     description = 'A grouping of component properties and possibly "VALARM" \
                    calendar components that represent an action-item or \
                    assignment.'
-    knownChildren = {
-        "DTSTART": (0, 1, None),  # min, max, behaviorRegistry id
+    known_children = {
+        "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CLASS": (0, 1, None),
         "COMPLETED": (0, 1, None),
         "CREATED": (0, 1, None),
@@ -1241,18 +1239,18 @@ class VTodo(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         if "due" in obj.contents and "duration" in obj.contents:
-            if raiseException:
+            if raise_exception:
                 m = "VTODO components cannot contain both DUE and DURATION\
                      components"
                 raise ValidateError(m)
             return False
         else:
-            return super(VTodo, cls).validate(obj, raiseException, *args)
+            return super(VTodo, cls).validate(obj, raise_exception, *args)
 
 
-registerBehavior(VTodo)
+register_behavior(VTodo)
 
 
 class VJournal(RecurringBehavior):
@@ -1261,8 +1259,8 @@ class VJournal(RecurringBehavior):
     """
 
     name = "VJOURNAL"
-    knownChildren = {
-        "DTSTART": (0, 1, None),  # min, max, behaviorRegistry id
+    known_children = {
+        "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CLASS": (0, 1, None),
         "CREATED": (0, 1, None),
         "DESCRIPTION": (0, 1, None),
@@ -1289,7 +1287,7 @@ class VJournal(RecurringBehavior):
     }
 
 
-registerBehavior(VJournal)
+register_behavior(VJournal)
 
 
 class VFreeBusy(VCalendarComponentBehavior):
@@ -1301,9 +1299,9 @@ class VFreeBusy(VCalendarComponentBehavior):
     description = "A grouping of component properties that describe either a \
                    request for free/busy time, describe a response to a request \
                    for free/busy time or describe a published set of busy time."
-    sortFirst = ("uid", "dtstart", "duration", "dtend")
-    knownChildren = {
-        "DTSTART": (0, 1, None),  # min, max, behaviorRegistry id
+    sort_first = ("uid", "dtstart", "duration", "dtend")
+    known_children = {
+        "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CONTACT": (0, 1, None),
         "DTEND": (0, 1, None),
         "DURATION": (0, 1, None),
@@ -1318,7 +1316,7 @@ class VFreeBusy(VCalendarComponentBehavior):
     }
 
 
-registerBehavior(VFreeBusy)
+register_behavior(VFreeBusy)
 
 
 class VAlarm(VCalendarComponentBehavior):
@@ -1329,8 +1327,8 @@ class VAlarm(VCalendarComponentBehavior):
     name = "VALARM"
     description = "Alarms describe when and how to provide alerts about events \
                    and to-dos."
-    knownChildren = {
-        "ACTION": (1, 1, None),  # min, max, behaviorRegistry id
+    known_children = {
+        "ACTION": (1, 1, None),  # min, max, behavior_registry id
         "TRIGGER": (1, 1, None),
         "DURATION": (0, 1, None),
         "REPEAT": (0, 1, None),
@@ -1338,7 +1336,7 @@ class VAlarm(VCalendarComponentBehavior):
     }
 
     @staticmethod
-    def generateImplicitParameters(obj):
+    def generate_implicit_parameters(obj):
         """
         Create default ACTION and TRIGGER if they're not set.
         """
@@ -1352,22 +1350,22 @@ class VAlarm(VCalendarComponentBehavior):
             obj.add("trigger").value = dt.timedelta(0)
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         """
         # TODO
         if obj.contents.has_key('dtend') and obj.contents.has_key('duration'):
-            if raiseException:
+            if raise_exception:
                 m = "VEVENT components cannot contain both DTEND and DURATION\
                      components"
                 raise ValidateError(m)
             return False
         else:
-            return super(VEvent, cls).validate(obj, raiseException, *args)
+            return super(VEvent, cls).validate(obj, raise_exception, *args)
         """
         return True
 
 
-registerBehavior(VAlarm)
+register_behavior(VAlarm)
 
 
 class VAvailability(VCalendarComponentBehavior):
@@ -1379,9 +1377,9 @@ class VAvailability(VCalendarComponentBehavior):
 
     name = "VAVAILABILITY"
     description = "A component used to represent a user's available time slots."
-    sortFirst = ("uid", "dtstart", "duration", "dtend")
-    knownChildren = {
-        "UID": (1, 1, None),  # min, max, behaviorRegistry id
+    sort_first = ("uid", "dtstart", "duration", "dtend")
+    known_children = {
+        "UID": (1, 1, None),  # min, max, behavior_registry id
         "DTSTAMP": (1, 1, None),
         "BUSYTYPE": (0, 1, None),
         "CREATED": (0, 1, None),
@@ -1400,17 +1398,17 @@ class VAvailability(VCalendarComponentBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         if "dtend" in obj.contents and "duration" in obj.contents:
-            if raiseException:
+            if raise_exception:
                 m = "VAVAILABILITY components cannot contain both DTEND and DURATION components"
                 raise ValidateError(m)
             return False
         else:
-            return super(VAvailability, cls).validate(obj, raiseException, *args)
+            return super(VAvailability, cls).validate(obj, raise_exception, *args)
 
 
-registerBehavior(VAvailability)
+register_behavior(VAvailability)
 
 
 class Available(RecurringBehavior):
@@ -1419,10 +1417,10 @@ class Available(RecurringBehavior):
     """
 
     name = "AVAILABLE"
-    sortFirst = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
     description = "Defines a period of time in which a user is normally available."
-    knownChildren = {
-        "DTSTAMP": (1, 1, None),  # min, max, behaviorRegistry id
+    known_children = {
+        "DTSTAMP": (1, 1, None),  # min, max, behavior_registry id
         "DTSTART": (1, 1, None),
         "UID": (1, 1, None),
         "DTEND": (0, 1, None),  # NOTE: One of DtEnd or
@@ -1440,26 +1438,26 @@ class Available(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raiseException, *args):
+    def validate(cls, obj, raise_exception, *args):
         has_dtend = "dtend" in obj.contents
         has_duration = "duration" in obj.contents
         if has_dtend and has_duration:
-            if raiseException:
+            if raise_exception:
                 m = "AVAILABLE components cannot contain both DTEND and DURATION\
                      properties"
                 raise ValidateError(m)
             return False
         elif not (has_dtend or has_duration):
-            if raiseException:
+            if raise_exception:
                 m = "AVAILABLE components must contain one of DTEND or DURATION\
                      properties"
                 raise ValidateError(m)
             return False
         else:
-            return super(Available, cls).validate(obj, raiseException, *args)
+            return super(Available, cls).validate(obj, raise_exception, *args)
 
 
-registerBehavior(Available)
+register_behavior(Available)
 
 
 class Duration(behavior.Behavior):
@@ -1468,21 +1466,21 @@ class Duration(behavior.Behavior):
     """
 
     name = "DURATION"
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn obj.value into a dt.timedelta.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
-        obj.isNative = True
+        obj.is_native = True
         obj.value = obj.value
         if obj.value == "":
             return obj
         else:
-            deltalist = stringToDurations(obj.value)
+            deltalist = string_to_durations(obj.value)
             # When can DURATION have multiple durations?  For now:
             if len(deltalist) == 1:
                 obj.value = deltalist[0]
@@ -1491,18 +1489,18 @@ class Duration(behavior.Behavior):
                 raise ParseError("DURATION must have a single duration string.")
 
     @staticmethod
-    def transformFromNative(obj):
+    def transform_from_native(obj):
         """
         Replace the dt.timedelta in obj.value with an RFC2445 string.
         """
-        if not obj.isNative:
+        if not obj.is_native:
             return obj
-        obj.isNative = False
-        obj.value = timedeltaToString(obj.value)
+        obj.is_native = False
+        obj.value = timedelta_to_string(obj.value)
         return obj
 
 
-registerBehavior(Duration)
+register_behavior(Duration)
 
 
 class Trigger(behavior.Behavior):
@@ -1512,25 +1510,25 @@ class Trigger(behavior.Behavior):
 
     name = "TRIGGER"
     description = "This property specifies when an alarm will trigger."
-    hasNative = True
+    has_native = True
     forceUTC = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Turn obj.value into a timedelta or dt.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
         value = getattr(obj, "value_param", "DURATION").upper()
         if hasattr(obj, "value_param"):
             del obj.value_param
         if obj.value == "":
-            obj.isNative = True
+            obj.is_native = True
             return obj
         elif value == "DURATION":
             try:
-                return Duration.transformToNative(obj)
+                return Duration.transform_to_native(obj)
             except ParseError:
                 logger.warning(
                     "TRIGGER not recognized as DURATION, trying "
@@ -1538,8 +1536,8 @@ class Trigger(behavior.Behavior):
                     "DATE-TIMEs without setting VALUE=DATE-TIME"
                 )
                 try:
-                    obj.isNative = False
-                    dt = DateTimeBehavior.transformToNative(obj)
+                    obj.is_native = False
+                    dt = DateTimeBehavior.transform_to_native(obj)
                     return dt
                 except AllException:
                     msg = "TRIGGER with no VALUE not recognized as DURATION " "or as DATE-TIME"
@@ -1547,22 +1545,22 @@ class Trigger(behavior.Behavior):
         elif value == "DATE-TIME":
             # TRIGGERs with DATE-TIME values must be in UTC, we could validate
             # that fact, for now we take it on faith.
-            return DateTimeBehavior.transformToNative(obj)
+            return DateTimeBehavior.transform_to_native(obj)
         else:
             raise ParseError("VALUE must be DURATION or DATE-TIME")
 
     @staticmethod
-    def transformFromNative(obj):
+    def transform_from_native(obj):
         if type(obj.value) is dt.datetime:
             obj.value_param = "DATE-TIME"
-            return UTCDateTimeBehavior.transformFromNative(obj)
+            return UTCDateTimeBehavior.transform_from_native(obj)
         elif type(obj.value) is dt.timedelta:
-            return Duration.transformFromNative(obj)
+            return Duration.transform_from_native(obj)
         else:
             raise NativeError("Native TRIGGER values must be timedelta or " "datetime")
 
 
-registerBehavior(Trigger)
+register_behavior(Trigger)
 
 
 class PeriodBehavior(behavior.Behavior):
@@ -1570,35 +1568,35 @@ class PeriodBehavior(behavior.Behavior):
     A list of (date-time, timedelta) tuples.
     """
 
-    hasNative = True
+    has_native = True
 
     @staticmethod
-    def transformToNative(obj):
+    def transform_to_native(obj):
         """
         Convert comma separated periods into tuples.
         """
-        if obj.isNative:
+        if obj.is_native:
             return obj
-        obj.isNative = True
+        obj.is_native = True
         if obj.value == "":
             obj.value = []
             return obj
-        tzinfo = getTzid(getattr(obj, "tzid_param", None))
-        obj.value = [stringToPeriod(x, tzinfo) for x in obj.value.split(",")]
+        tzinfo = get_tzid(getattr(obj, "tzid_param", None))
+        obj.value = [string_to_period(x, tzinfo) for x in obj.value.split(",")]
         return obj
 
     @classmethod
-    def transformFromNative(cls, obj):
+    def transform_from_native(cls, obj):
         """
         Convert the list of tuples in obj.value to strings.
         """
-        if obj.isNative:
-            obj.isNative = False
+        if obj.is_native:
+            obj.is_native = False
             transformed = []
             for tup in obj.value:
-                transformed.append(periodToString(tup, cls.forceUTC))
+                transformed.append(period_to_string(tup, cls.forceUTC))
             if len(transformed) > 0:
-                tzid = TimezoneComponent.registerTzinfo(tup[0].tzinfo)
+                tzid = TimezoneComponent.register_tzinfo(tup[0].tzinfo)
                 if not cls.forceUTC and tzid is not None:
                     obj.tzid_param = tzid
 
@@ -1616,7 +1614,7 @@ class FreeBusy(PeriodBehavior):
     forceUTC = True
 
 
-registerBehavior(FreeBusy, "FREEBUSY")
+register_behavior(FreeBusy, "FREEBUSY")
 
 
 class RRule(behavior.Behavior):
@@ -1626,20 +1624,20 @@ class RRule(behavior.Behavior):
     """
 
 
-registerBehavior(RRule, "RRULE")
-registerBehavior(RRule, "EXRULE")
+register_behavior(RRule, "RRULE")
+register_behavior(RRule, "EXRULE")
 
 # ------------------------ Registration of common classes ----------------------
-utcDateTimeList = ["LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP"]
-list(map(lambda x: registerBehavior(UTCDateTimeBehavior, x), utcDateTimeList))
+utc_date_time_list = ["LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP"]
+list(map(lambda x: register_behavior(UTCDateTimeBehavior, x), utc_date_time_list))
 
-dateTimeOrDateList = ["DTEND", "DTSTART", "DUE", "RECURRENCE-ID"]
-list(map(lambda x: registerBehavior(DateOrDateTimeBehavior, x), dateTimeOrDateList))
+date_time_or_date_list = ["DTEND", "DTSTART", "DUE", "RECURRENCE-ID"]
+list(map(lambda x: register_behavior(DateOrDateTimeBehavior, x), date_time_or_date_list))
 
-registerBehavior(MultiDateBehavior, "RDATE")
-registerBehavior(MultiDateBehavior, "EXDATE")
+register_behavior(MultiDateBehavior, "RDATE")
+register_behavior(MultiDateBehavior, "EXDATE")
 
-textList = [
+text_list = [
     "CALSCALE",
     "METHOD",
     "PRODID",
@@ -1656,14 +1654,14 @@ textList = [
     "ACTION",
     "BUSYTYPE",
 ]
-list(map(lambda x: registerBehavior(TextBehavior, x), textList))
+list(map(lambda x: register_behavior(TextBehavior, x), text_list))
 
-list(map(lambda x: registerBehavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
-registerBehavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
+list(map(lambda x: register_behavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
+register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
 
 
 # ------------------------ Serializing helper functions ------------------------
-def numToDigits(num, places):
+def num_to_digits(num, places):
     """
     Helper, for converting numbers to textual digits.
     """
@@ -1676,7 +1674,7 @@ def numToDigits(num, places):
         return s
 
 
-def timedeltaToString(delta):
+def timedelta_to_string(delta):
     """
     Convert timedelta to an ical DURATION.
     """
@@ -1709,28 +1707,28 @@ def timedeltaToString(delta):
     return output
 
 
-def timeToString(dateOrDateTime):
+def time_to_string(date_or_date_time):
     """
-    Wraps dateToString and dateTimeToString, returning the results
+    Wraps date_to_string and datetime_to_string, returning the results
     of either based on the type of the argument
     """
-    if hasattr(dateOrDateTime, "hour"):
-        return dateTimeToString(dateOrDateTime)
-    return dateToString(dateOrDateTime)
+    if hasattr(date_or_date_time, "hour"):
+        return date_time_to_string(date_or_date_time)
+    return date_to_string(date_or_date_time)
 
 
-def dateToString(date):
-    year = numToDigits(date.year, 4)
-    month = numToDigits(date.month, 2)
-    day = numToDigits(date.day, 2)
+def date_to_string(date):
+    year = num_to_digits(date.year, 4)
+    month = num_to_digits(date.month, 2)
+    day = num_to_digits(date.day, 2)
     return year + month + day
 
 
-def dateTimeToString(date_time, convertToUTC=False):
+def date_time_to_string(date_time, convert_toUTC=False):
     """
-    Ignore tzinfo unless convertToUTC.  Output string.
+    Ignore tzinfo unless convert_toUTC.  Output string.
     """
-    if date_time.tzinfo and convertToUTC:
+    if date_time.tzinfo and convert_toUTC:
         date_time = date_time.astimezone(utc)
 
     datestr = date_time.strftime("%Y%m%dT%H%M%S")
@@ -1752,42 +1750,42 @@ def datetime_to_string(date_time, convert_to_utc=False) -> str:
     return datestr
 
 
-def deltaToOffset(delta):
-    absDelta = abs(delta)
-    hours = int(absDelta.seconds / 3600)
-    hoursString = numToDigits(hours, 2)
-    minutes = int(absDelta.seconds / 60) % 60
-    minutesString = numToDigits(minutes, 2)
-    if absDelta == delta:
-        signString = "+"
+def delta_to_offset(delta):
+    abs_delta = abs(delta)
+    hours = int(abs_delta.seconds / 3600)
+    hours_string = num_to_digits(hours, 2)
+    minutes = int(abs_delta.seconds / 60) % 60
+    minutes_string = num_to_digits(minutes, 2)
+    if abs_delta == delta:
+        sign_string = "+"
     else:
-        signString = "-"
-    return signString + hoursString + minutesString
+        sign_string = "-"
+    return sign_string + hours_string + minutes_string
 
 
-def periodToString(period, convertToUTC=False):
-    txtstart = dateTimeToString(period[0], convertToUTC)
+def period_to_string(period, convert_toUTC=False):
+    txtstart = date_time_to_string(period[0], convert_toUTC)
     if isinstance(period[1], dt.timedelta):
-        txtend = timedeltaToString(period[1])
+        txtend = timedelta_to_string(period[1])
     else:
-        txtend = dateTimeToString(period[1], convertToUTC)
+        txtend = date_time_to_string(period[1], convert_toUTC)
     return txtstart + "/" + txtend
 
 
 # ----------------------- Parsing functions ------------------------------------
-def isDuration(s):
+def is_duration(s):
     s = s.upper()
     return (s.find("P") != -1) and (s.find("P") < 2)
 
 
-def stringToDate(s):
+def string_to_date(s):
     year = int(s[0:4])
     month = int(s[4:6])
     day = int(s[6:8])
     return dt.date(year, month, day)
 
 
-def stringToDateTime(s, tzinfo=None, strict=False):
+def string_to_date_time(s, tzinfo=None, strict=False):
     """
     Returns dt.datetime object.
     """
@@ -1797,7 +1795,7 @@ def stringToDateTime(s, tzinfo=None, strict=False):
     try:
         _datetime = dt.datetime.strptime(s[:15], "%Y%m%dT%H%M%S")
         if len(s) > 15 and s[15] == "Z":
-            tzinfo = getTzid("UTC")
+            tzinfo = get_tzid("UTC")
     except ValueError:
         raise ParseError("'{0!s}' is not a valid DATE-TIME".format(s))
     year = _datetime.year and _datetime.year or 2000
@@ -1812,18 +1810,18 @@ def stringToDateTime(s, tzinfo=None, strict=False):
 
 # DQUOTE included to work around iCal's penchant for backslash escaping it,
 # although it isn't actually supposed to be escaped according to rfc2445 TEXT
-escapableCharList = '\\;,Nn"'
+escapable_char_list = '\\;,Nn"'
 
 
-def stringToTextValues(s, listSeparator=",", charList=None, strict=False):
+def string_to_text_values(s, list_separator=",", char_list=None, strict=False):
     """
     Returns list of strings.
     """
-    if charList is None:
-        charList = escapableCharList
+    if char_list is None:
+        char_list = escapable_char_list
 
-    def escapableChar(c):
-        return c in charList
+    def escapable_char(c):
+        return c in char_list
 
     def error(msg):
         if strict:
@@ -1832,19 +1830,19 @@ def stringToTextValues(s, listSeparator=",", charList=None, strict=False):
             logging.error(msg)
 
     # vars which control state machine
-    charIterator = enumerate(s)
+    char_iterator = enumerate(s)
     state = "read normal"
 
     current = []
     results = []
 
     while True:
-        charIndex, char = next(charIterator, (None, "eof"))
+        char_index, char = next(char_iterator, (None, "eof"))
 
         if state == "read normal":
             if char == "\\":
                 state = "read escaped char"
-            elif char == listSeparator:
+            elif char == list_separator:
                 state = "read normal"
                 current = "".join(current)
                 results.append(current)
@@ -1856,7 +1854,7 @@ def stringToTextValues(s, listSeparator=",", charList=None, strict=False):
                 current.append(char)
 
         elif state == "read escaped char":
-            if escapableChar(char):
+            if escapable_char(char):
                 state = "read normal"
                 if char in "nN":
                     current.append("\n")
@@ -1881,12 +1879,12 @@ def stringToTextValues(s, listSeparator=",", charList=None, strict=False):
             error("unknown state: '{0!s}' reached in {1!s}".format(state, s))
 
 
-def stringToDurations(s, strict=False):
+def string_to_durations(s, strict=False):
     """
     Returns list of timedelta objects.
     """
 
-    def makeTimedelta(sign, week, day, hour, minute, sec):
+    def make_timedelta(sign, week, day, hour, minute, sec):
         if sign == "-":
             sign = -1
         else:
@@ -1905,7 +1903,7 @@ def stringToDurations(s, strict=False):
             raise ParseError(msg)
 
     # vars which control state machine
-    charIterator = enumerate(s)
+    char_iterator = enumerate(s)
     state = "start"
 
     durations = []
@@ -1919,7 +1917,7 @@ def stringToDurations(s, strict=False):
 
     while True:
 
-        charIndex, char = next(charIterator, (None, "eof"))
+        char_index, char = next(char_iterator, (None, "eof"))
 
         if state == "start":
             if char == "+":
@@ -1968,7 +1966,7 @@ def stringToDurations(s, strict=False):
                 current = ""
             elif char == ",":
                 state = "start"
-                durations.append(makeTimedelta(sign, week, day, hour, minute, sec))
+                durations.append(make_timedelta(sign, week, day, hour, minute, sec))
                 current = ""
                 sign = None
                 week = None
@@ -1984,7 +1982,7 @@ def stringToDurations(s, strict=False):
 
         elif state == "end":  # an end state
             if sign or week or day or hour or minute or sec:
-                durations.append(makeTimedelta(sign, week, day, hour, minute, sec))
+                durations.append(make_timedelta(sign, week, day, hour, minute, sec))
             return durations
 
         elif state == "error":  # an end state
@@ -1996,50 +1994,50 @@ def stringToDurations(s, strict=False):
             error("unknown state: '{0!s}' reached in {1!s}".format(state, s))
 
 
-def parseDtstart(contentline, allowSignatureMismatch=False):
+def parse_dtstart(contentline, allow_signature_mismatch=False):
     """
     Convert a contentline's value into a date or date-time.
 
     A variety of clients don't serialize dates with the appropriate VALUE
     parameter, so rather than failing on these (technically invalid) lines,
-    if allowSignatureMismatch is True, try to parse both varieties.
+    if allow_signature_mismatch is True, try to parse both varieties.
     """
-    tzinfo = getTzid(getattr(contentline, "tzid_param", None))
-    valueParam = getattr(contentline, "value_param", "DATE-TIME").upper()
-    if valueParam == "DATE":
-        return stringToDate(contentline.value)
-    elif valueParam == "DATE-TIME":
+    tzinfo = get_tzid(getattr(contentline, "tzid_param", None))
+    value_param = getattr(contentline, "value_param", "DATE-TIME").upper()
+    if value_param == "DATE":
+        return string_to_date(contentline.value)
+    elif value_param == "DATE-TIME":
         try:
-            return stringToDateTime(contentline.value, tzinfo)
+            return string_to_date_time(contentline.value, tzinfo)
         except AllException:
-            if allowSignatureMismatch:
-                return stringToDate(contentline.value)
+            if allow_signature_mismatch:
+                return string_to_date(contentline.value)
             else:
                 raise
 
 
-def stringToPeriod(s, tzinfo=None):
+def string_to_period(s, tzinfo=None):
     values = s.split("/")
-    start = stringToDateTime(values[0], tzinfo)
-    valEnd = values[1]
-    if isDuration(valEnd):  # period-start = date-time "/" dur-value
-        delta = stringToDurations(valEnd)[0]
+    start = string_to_date_time(values[0], tzinfo)
+    val_end = values[1]
+    if is_duration(val_end):  # period-start = date-time "/" dur-value
+        delta = string_to_durations(val_end)[0]
         return (start, delta)
     else:
-        return (start, stringToDateTime(valEnd, tzinfo))
+        return (start, string_to_date_time(val_end, tzinfo))
 
 
-def getTransition(transitionTo, year, tzinfo):
+def get_transition(transition_to, year, tzinfo):
     """
     Return the datetime of the transition to/from DST, or None.
     """
 
-    def firstTransition(iterDates, test):
+    def first_transition(iter_dates, test):
         """
         Return the last date not matching test, or None if all tests matched.
         """
         success = None
-        for _dt in iterDates:
+        for _dt in iter_dates:
             if not test(_dt):
                 success = _dt
             else:
@@ -2047,7 +2045,7 @@ def getTransition(transitionTo, year, tzinfo):
                     return success
         return success  # may be None
 
-    def generateDates(year, month=None, day=None):
+    def generate_dates(year, month=None, day=None):
         """
         Iterate over possible dates with unspecified values.
         """
@@ -2067,51 +2065,51 @@ def getTransition(transitionTo, year, tzinfo):
             for hour in hours:
                 yield dt.datetime(year, month, day, hour)
 
-    assert transitionTo in ("daylight", "standard")
-    if transitionTo == "daylight":
+    assert transition_to in ("daylight", "standard")
+    if transition_to == "daylight":
 
         def test(dt):
             try:
-                return tzinfo.dst(dt) != zeroDelta
+                return tzinfo.dst(dt) != zero_delta
             except pytz.NonExistentTimeError:
                 return True  # entering daylight time
             except pytz.AmbiguousTimeError:
                 return False  # entering standard time
 
-    elif transitionTo == "standard":
+    elif transition_to == "standard":
 
         def test(dt):
             try:
-                return tzinfo.dst(dt) == zeroDelta
+                return tzinfo.dst(dt) == zero_delta
             except pytz.NonExistentTimeError:
                 return False  # entering daylight time
             except pytz.AmbiguousTimeError:
                 return True  # entering standard time
 
     newyear = dt.datetime(year, 1, 1)
-    monthDt = firstTransition(generateDates(year), test)
-    if monthDt is None:
+    month_dt = first_transition(generate_dates(year), test)
+    if month_dt is None:
         return newyear
-    elif monthDt.month == 12:
+    elif month_dt.month == 12:
         return None
     else:
         # there was a good transition somewhere in a non-December month
-        month = monthDt.month
-        day = firstTransition(generateDates(year, month), test).day
-        uncorrected = firstTransition(generateDates(year, month, day), test)
-        if transitionTo == "standard":
+        month = month_dt.month
+        day = first_transition(generate_dates(year, month), test).day
+        uncorrected = first_transition(generate_dates(year, month, day), test)
+        if transition_to == "standard":
             # assuming tzinfo.dst returns a new offset for the first
             # possible hour, we need to add one hour for the offset change
-            # and another hour because firstTransition returns the hour
+            # and another hour because first_transition returns the hour
             # before the transition
             return uncorrected + dt.timedelta(hours=2)
         else:
             return uncorrected + dt.timedelta(hours=1)
 
 
-def tzinfo_eq(tzinfo1, tzinfo2, startYear=2000, endYear=2020):
+def tzinfo_eq(tzinfo1, tzinfo2, start_year=2000, end_year=2020):
     """
-    Compare offsets and DST transitions from startYear to endYear.
+    Compare offsets and DST transitions from start_year to end_year.
     """
     if tzinfo1 == tzinfo2:
         return True
@@ -2123,12 +2121,12 @@ def tzinfo_eq(tzinfo1, tzinfo2, startYear=2000, endYear=2020):
             return True
         return tzinfo1.utcoffset(_dt) == tzinfo2.utcoffset(_dt)
 
-    if not dt_test(dt.datetime(startYear, 1, 1)):
+    if not dt_test(dt.datetime(start_year, 1, 1)):
         return False
-    for year in range(startYear, endYear):
-        for transitionTo in "daylight", "standard":
-            t1 = getTransition(transitionTo, year, tzinfo1)
-            t2 = getTransition(transitionTo, year, tzinfo2)
+    for year in range(start_year, end_year):
+        for transition_to in "daylight", "standard":
+            t1 = get_transition(transition_to, year, tzinfo1)
+            t2 = get_transition(transition_to, year, tzinfo2)
             if t1 != t2 or not dt_test(t1):
                 return False
     return True

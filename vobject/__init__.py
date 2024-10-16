@@ -8,7 +8,7 @@ VObject Overview
     Parsing existing streams
     ------------------------
     Streams containing one or many L{Component<base.Component>}s can be
-    parsed using L{readComponents<base.readComponents>}.  As each Component
+    parsed using L{read_components<base.read_components>}.  As each Component
     is parsed, vobject will attempt to give it a L{Behavior<behavior.Behavior>}.
     If an appropriate Behavior is found, any base64, quoted-printable, or
     backslash escaped data will automatically be decoded.  Dates and datetimes
@@ -77,15 +77,15 @@ VObject Overview
 """
 
 from . import icalendar, vcard
-from .base import newFromBehavior, readComponents, readOne
+from .base import new_from_behavior, read_components, read_one
 
 # Package version
 VERSION = "0.9.9"
 
 
 def iCalendar():
-    return newFromBehavior("vcalendar", "2.0")
+    return new_from_behavior("vcalendar", "2.0")
 
 
 def vCard():
-    return newFromBehavior("vcard", "3.0")
+    return new_from_behavior("vcard", "3.0")

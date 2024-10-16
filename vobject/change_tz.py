@@ -46,7 +46,7 @@ def convert_events(utc_only, args):
     _tzone = args[1] if len(args) > 1 else "UTC"
 
     print("... Reading {}".format(ics_file))
-    cal = vobject.readOne(open(ics_file))
+    cal = vobject.read_one(open(ics_file))
     change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz("UTC"), utc_only=utc_only)
 
     out_name = "{}.converted".format(ics_file)

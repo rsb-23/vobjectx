@@ -32,7 +32,7 @@ from datetime import date, datetime, timedelta
 
 import six
 
-from .base import CRLF, registerBehavior
+from .base import CRLF, register_behavior
 from .icalendar import VCalendar2_0
 
 
@@ -40,7 +40,7 @@ class HCalendar(VCalendar2_0):
     name = "HCALENDAR"
 
     @classmethod
-    def serialize(cls, obj, buf=None, lineLength=None, validate=True):
+    def serialize(cls, obj, buf=None, line_length=None, validate=True):
         """
         Serialize iCalendar to HTML using the hCalendar microformat (http://microformats.org/wiki/hcalendar)
         """
@@ -65,17 +65,17 @@ class HCalendar(VCalendar2_0):
             level += 1
 
             # URL
-            url = event.getChildValue("url")
+            url = event.get_child_value("url")
             if url:
                 out('<a class="url" href="' + url + '">' + CRLF)
                 level += 1
             # SUMMARY
-            summary = event.getChildValue("summary")
+            summary = event.get_child_value("summary")
             if summary:
                 out('<span class="summary">' + summary + "</span>:" + CRLF)
 
             # DTSTART
-            dtstart = event.getChildValue("dtstart")
+            dtstart = event.get_child_value("dtstart")
             if dtstart:
                 machine = timeformat = ""
                 if type(dtstart) is date:
@@ -95,9 +95,9 @@ class HCalendar(VCalendar2_0):
                 )
 
                 # DTEND
-                dtend = event.getChildValue("dtend")
+                dtend = event.get_child_value("dtend")
                 if not dtend:
-                    duration = event.getChildValue("duration")
+                    duration = event.get_child_value("duration")
                     if duration:
                         dtend = duration + dtstart
                 # TODO: If lacking dtend & duration?
@@ -115,11 +115,11 @@ class HCalendar(VCalendar2_0):
                     )
 
             # LOCATION
-            location = event.getChildValue("location")
+            location = event.get_child_value("location")
             if location:
                 out('at <span class="location">' + location + "</span>" + CRLF)
 
-            description = event.getChildValue("description")
+            description = event.get_child_value("description")
             if description:
                 out('<div class="description">' + description + "</div>" + CRLF)
 
@@ -133,4 +133,4 @@ class HCalendar(VCalendar2_0):
         return buf or outbuf.getvalue()
 
 
-registerBehavior(HCalendar)
+register_behavior(HCalendar)

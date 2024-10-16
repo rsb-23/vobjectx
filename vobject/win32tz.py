@@ -56,8 +56,10 @@ class Win32tz(datetime.tzinfo):
 
     def _isdst(self, dt):
         dat = self.data
-        dston = pickNthWeekday(dt.year, dat.dstmonth, dat.dstdayofweek, dat.dsthour, dat.dstminute, dat.dstweeknumber)
-        dstoff = pickNthWeekday(dt.year, dat.stdmonth, dat.stddayofweek, dat.stdhour, dat.stdminute, dat.stdweeknumber)
+        dston = pick_nth_weekday(dt.year, dat.dstmonth, dat.dstdayofweek, dat.dsthour, dat.dstminute, dat.dstweeknumber)
+        dstoff = pick_nth_weekday(
+            dt.year, dat.stdmonth, dat.stddayofweek, dat.stdhour, dat.stdminute, dat.stdweeknumber
+        )
         if dston < dstoff:
             return dston <= dt.replace(tzinfo=None) < dstoff
         else:
@@ -67,7 +69,7 @@ class Win32tz(datetime.tzinfo):
         return "<win32tz - {0!s}>".format(self.data.display)
 
 
-def pickNthWeekday(year, month, dayofweek, hour, minute, whichweek):
+def pick_nth_weekday(year, month, dayofweek, hour, minute, whichweek):
     """dayofweek == 0 means Sunday, whichweek > 4 means last instance"""
     first = datetime.datetime(year=year, month=month, hour=hour, minute=minute, day=1)
     weekdayone = first.replace(day=((dayofweek - first.isoweekday()) % 7 + 1))
@@ -77,13 +79,13 @@ def pickNthWeekday(year, month, dayofweek, hour, minute, whichweek):
             return dt
 
 
-class Win32tzData(object):
+class Win32tzData:
     """Read a registry key for a timezone, expose its contents."""
 
     def __init__(self, path):
         """Load path, or if path is empty, load local time."""
         if path:
-            keydict = valuesToDict(winreg.OpenKey(tzparent, path))
+            keydict = values_to_dict(winreg.OpenKey(tzparent, path))
             self.display = keydict["Display"]
             self.dstname = keydict["Dlt"]
             self.stdname = keydict["Std"]
@@ -108,13 +110,13 @@ class Win32tzData(object):
             self.dstminute = tup[5 + offset]
 
         else:
-            keydict = valuesToDict(localkey)
+            keydict = values_to_dict(localkey)
 
             self.stdname = keydict["StandardName"]
             self.dstname = keydict["DaylightName"]
 
             sourcekey = winreg.OpenKey(tzparent, self.stdname)
-            self.display = valuesToDict(sourcekey)["Display"]
+            self.display = values_to_dict(sourcekey)["Display"]
 
             self.stdoffset = -keydict["Bias"] - keydict["StandardBias"]
             self.dstoffset = self.stdoffset - keydict["DaylightBias"]
@@ -137,7 +139,7 @@ class Win32tzData(object):
             self.dstminute = tup[5 + offset]
 
 
-def valuesToDict(key):
+def values_to_dict(key):
     """Convert a registry key's values to a dictionary."""
     d = {}
     size = winreg.QueryInfoKey(key)[1]
