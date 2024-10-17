@@ -28,103 +28,99 @@ and an equivalent event in hCalendar format with various elements optimized appr
 </span>
 """
 
-import six
-
 from datetime import date, datetime, timedelta
 
-from .base import CRLF, registerBehavior
+from .base import register_behavior
+from .helper import Character, get_buffer, indent_str
 from .icalendar import VCalendar2_0
 
 
 class HCalendar(VCalendar2_0):
-    name = 'HCALENDAR'
+    name = "HCALENDAR"
 
     @classmethod
-    def serialize(cls, obj, buf=None, lineLength=None, validate=True):
+    def serialize(cls, obj, buf=None, line_length=None, validate=True):
         """
         Serialize iCalendar to HTML using the hCalendar microformat (http://microformats.org/wiki/hcalendar)
         """
 
-        outbuf = buf or six.StringIO()
-        level = 0  # holds current indentation level
-        tabwidth = 3
+        outbuf = buf or get_buffer()
+        level, tabwidth = 0, 3  # holds current indentation level
 
-        def indent():
-            return ' ' * level * tabwidth
-
-        def out(s):
-            outbuf.write(indent())
-            outbuf.write(s)
+        def buffer_write(s):
+            outbuf.write(f"{indent_str(level=level, tabwidth=tabwidth)}{s}{Character.CRLF}")
 
         # not serializing optional vcalendar wrapper
 
         vevents = obj.vevent_list
 
         for event in vevents:
-            out('<span class="vevent">' + CRLF)
+            buffer_write('<span class="vevent">')
             level += 1
 
             # URL
-            url = event.getChildValue("url")
+            url = event.get_child_value("url")
             if url:
-                out('<a class="url" href="' + url + '">' + CRLF)
+                buffer_write(f'<a class="url" href="{url}">')
                 level += 1
             # SUMMARY
-            summary = event.getChildValue("summary")
+            summary = event.get_child_value("summary")
             if summary:
-                out('<span class="summary">' + summary + '</span>:' + CRLF)
+                buffer_write(f'<span class="summary">{summary}</span>:')
 
             # DTSTART
-            dtstart = event.getChildValue("dtstart")
+            dtstart = event.get_child_value("dtstart")
             if dtstart:
-                if type(dtstart) == date:
+                machine = timeformat = ""
+                if type(dtstart) is date:
                     timeformat = "%A, %B %e"
                     machine = "%Y%m%d"
-                elif type(dtstart) == datetime:
+                elif type(dtstart) is datetime:
                     timeformat = "%A, %B %e, %H:%M"
                     machine = "%Y%m%dT%H%M%S%z"
 
-                #TODO: Handle non-datetime formats?
-                #TODO: Spec says we should handle when dtstart isn't included
+                # TODO: Handle non-datetime formats?
+                # TODO: Spec says we should handle when dtstart isn't included
 
-                out('<abbr class="dtstart", title="{0!s}">{1!s}</abbr>\r\n'
-                    .format(dtstart.strftime(machine),
-                            dtstart.strftime(timeformat)))
+                buffer_write(
+                    f'<abbr class="dtstart", title="{dtstart.strftime(machine)}">{dtstart.strftime(timeformat)}</abbr>'
+                )
 
                 # DTEND
-                dtend = event.getChildValue("dtend")
+                dtend = event.get_child_value("dtend")
                 if not dtend:
-                    duration = event.getChildValue("duration")
+                    duration = event.get_child_value("duration")
                     if duration:
                         dtend = duration + dtstart
-                   # TODO: If lacking dtend & duration?
+                # TODO: If lacking dtend & duration?
 
                 if dtend:
                     human = dtend
                     # TODO: Human readable part could be smarter, excluding repeated data
-                    if type(dtend) == date:
+                    if type(dtend) is date:
                         human = dtend - timedelta(days=1)
 
-                    out('- <abbr class="dtend", title="{0!s}">{1!s}</abbr>\r\n'
-                        .format(dtend.strftime(machine),
-                                human.strftime(timeformat)))
+                    buffer_write(
+                        f'- <abbr class="dtend", title="{dtend.strftime(machine)}">{human.strftime(timeformat)}</abbr>'
+                    )
 
             # LOCATION
-            location = event.getChildValue("location")
+            location = event.get_child_value("location")
             if location:
-                out('at <span class="location">' + location + '</span>' + CRLF)
+                buffer_write(f'at <span class="location">{location}</span>')
 
-            description = event.getChildValue("description")
+            description = event.get_child_value("description")
             if description:
-                out('<div class="description">' + description + '</div>' + CRLF)
+                buffer_write(f'<div class="description">{description}</div>')
 
             if url:
                 level -= 1
-                out('</a>' + CRLF)
+                buffer_write("</a>")
 
             level -= 1
-            out('</span>' + CRLF)  # close vevent
+            buffer_write("</span>")  # close vevent
 
         return buf or outbuf.getvalue()
 
-registerBehavior(HCalendar)
+
+register_behavior(HCalendar)

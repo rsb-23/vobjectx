@@ -1,14 +1,14 @@
 """Translate an ics file's events to a different timezone."""
 
+from argparse import ArgumentParser
 from datetime import datetime
-from optparse import OptionParser
 
 import pytz
 from dateutil import tz
 
 import vobject
 
-version = "0.1"
+VERSION = "0.1"
 
 
 def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vobject.icalendar.utc):
@@ -23,9 +23,9 @@ def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vobject.icalend
         utc_tz (tzinfo): the tzinfo to compare to for UTC when processing utc_only=True
     """
 
-    for vevent in getattr(cal, 'vevent_list', []):
-        start = getattr(vevent, 'dtstart', None)
-        end = getattr(vevent, 'dtend', None)
+    for vevent in getattr(cal, "vevent_list", []):
+        start = getattr(vevent, "dtstart", None)
+        end = getattr(vevent, "dtend", None)
         for node in (start, end):
             if node:
                 dt = node.value
@@ -41,17 +41,17 @@ def show_timezones():
 
 
 def convert_events(utc_only, args):
-    print("Converting {} events".format('only UTC' if utc_only else 'all'))
+    print(f'Converting {"only UTC" if utc_only else "all"} events')
     ics_file = args[0]
-    _tzone = args[1] if len(args) > 1 else 'UTC'
+    _tzone = args[1] if len(args) > 1 else "UTC"
 
-    print("... Reading {}".format(ics_file))
-    cal = vobject.readOne(open(ics_file))
-    change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz('UTC'), utc_only=utc_only)
+    print(f"... Reading {ics_file}")
+    cal = vobject.read_one(open(ics_file))
+    change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz("UTC"), utc_only=utc_only)
 
-    out_name = "{}.converted".format(ics_file)
-    print("... Writing {}".format(out_name))
-    with open(out_name, 'wb') as out:
+    out_name = f"{ics_file}.converted"
+    print(f"... Writing {out_name}")
+    with open(out_name, "wb") as out:
         cal.serialize(out)
 
     print("Done")
@@ -69,13 +69,15 @@ def main():
 def get_options():
     # Configuration options
     usage = """usage: %prog [options] ics_file [timezone]"""
-    parser = OptionParser(usage=usage, version=vobject.VERSION)
-    parser.set_description("change_tz will convert the timezones in an ics file. ")
+    parser = ArgumentParser(usage=usage, description="change_tz will convert the timezones in an ics file. ")
+    parser.add_argument("--version", action="version", version=vobject.VERSION)
 
-    parser.add_option("-u", "--only-utc", dest="utc", action="store_true",
-                      default=False, help="Only change UTC events.")
-    parser.add_option("-l", "--list", dest="list", action="store_true",
-                      default=False, help="List available timezones")
+    parser.add_argument(
+        "-u", "--only-utc", dest="utc", action="store_true", default=False, help="Only change UTC events."
+    )
+    parser.add_argument(
+        "-l", "--list", dest="list", action="store_true", default=False, help="List available timezones"
+    )
 
     (cmdline_options, args) = parser.parse_args()
     if not (args or cmdline_options.list):

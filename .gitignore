@@ -5,8 +5,8 @@
 build/**/*
 dist/**/*
 vobject.egg-info/**/*
-venv/**/*
-.idea/*
+.idea/
+.venv/
+venv/
 *.sublime-*
 .coverage
-venv*
