@@ -36,23 +36,15 @@ class Win32tz(datetime.tzinfo):
         self.data = Win32tzData(name)
 
     def utcoffset(self, dt):
-        if self._isdst(dt):
-            return datetime.timedelta(minutes=self.data.dstoffset)
-        else:
-            return datetime.timedelta(minutes=self.data.stdoffset)
+        minutes = self.data.dstoffset if self._isdst(dt) else self.data.stdoffset
+        return datetime.timedelta(minutes=minutes)
 
     def dst(self, dt):
-        if self._isdst(dt):
-            minutes = self.data.dstoffset - self.data.stdoffset
-            return datetime.timedelta(minutes=minutes)
-        else:
-            return datetime.timedelta(0)
+        minutes = self.data.dstoffset - self.data.stdoffset if self._isdst(dt) else 0
+        return datetime.timedelta(minutes=minutes)
 
     def tzname(self, dt):
-        if self._isdst(dt):
-            return self.data.dstname
-        else:
-            return self.data.stdname
+        return self.data.dstname if self._isdst(dt) else self.data.stdname
 
     def _isdst(self, dt):
         dat = self.data
@@ -62,11 +54,11 @@ class Win32tz(datetime.tzinfo):
         )
         if dston < dstoff:
             return dston <= dt.replace(tzinfo=None) < dstoff
-        else:
-            return not (dstoff <= dt.replace(tzinfo=None) < dston)
+
+        return not (dstoff <= dt.replace(tzinfo=None) < dston)
 
     def __repr__(self):
-        return "<win32tz - {0!s}>".format(self.data.display)
+        return f"<win32tz - {self.data.display!s}>"
 
 
 def pick_nth_weekday(year, month, dayofweek, hour, minute, whichweek):
@@ -103,11 +95,6 @@ class Win32tzData:
             self.stdminute = tup[5 + offset]
 
             offset = 11
-            self.dstmonth = tup[1 + offset]
-            self.dstdayofweek = tup[2 + offset]  # Sunday=0
-            self.dstweeknumber = tup[3 + offset]  # Last = 5
-            self.dsthour = tup[4 + offset]
-            self.dstminute = tup[5 + offset]
 
         else:
             keydict = values_to_dict(localkey)
@@ -132,20 +119,18 @@ class Win32tzData:
             self.stdminute = tup[5 + offset]
 
             tup = struct.unpack("=8h", keydict["DaylightStart"])
-            self.dstmonth = tup[1 + offset]
-            self.dstdayofweek = tup[2 + offset]  # Sunday=0
-            self.dstweeknumber = tup[3 + offset]  # Last = 5
-            self.dsthour = tup[4 + offset]
-            self.dstminute = tup[5 + offset]
+
+        self.dstmonth = tup[1 + offset]
+        self.dstdayofweek = tup[2 + offset]  # Sunday=0
+        self.dstweeknumber = tup[3 + offset]  # Last = 5
+        self.dsthour = tup[4 + offset]
+        self.dstminute = tup[5 + offset]
 
 
 def values_to_dict(key):
     """Convert a registry key's values to a dictionary."""
-    d = {}
     size = winreg.QueryInfoKey(key)[1]
-    for i in range(size):
-        d[winreg.EnumValue(key, i)[0]] = winreg.EnumValue(key, i)[1]
-    return d
+    return {winreg.EnumValue(key, i)[0]: winreg.EnumValue(key, i)[1] for i in range(size)}
 
 
 def _test():

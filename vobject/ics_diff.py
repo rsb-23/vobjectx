@@ -1,12 +1,12 @@
+"""
+Compares VTODOs and VEVENTs in two iCalendar sources.
+"""
+
 from argparse import ArgumentParser
 
 import vobject
 
 from .base import new_from_behavior, read_one
-
-"""
-Compare VTODOs and VEVENTs in two iCalendar sources.
-"""
 
 
 def get_sort_key(component):
@@ -18,14 +18,11 @@ def get_sort_key(component):
 
     def get_sequence():
         sequence = component.get_child_value("sequence", 0)
-        return "{0:05d}".format(int(sequence))
+        return f"{int(sequence):05d}"
 
     def get_recurrence_id():
         recurrence_id = component.get_child_value("recurrence_id", None)
-        if recurrence_id is None:
-            return "0000-00-00"
-        else:
-            return recurrence_id.isoformat()
+        return "0000-00-00" if recurrence_id is None else recurrence_id.isoformat()
 
     return get_uid() + get_sequence() + get_recurrence_id()
 
@@ -80,9 +77,9 @@ def diff(left, right):
                     if right_index >= right_list_size:
                         output.append((comp, None))
                         break
-                    else:
-                        right_comp = right_list[right_index]
-                        right_key = get_sort_key(right_comp)
+
+                    right_comp = right_list[right_index]
+                    right_key = get_sort_key(right_comp)
 
                 if left_key < right_key:
                     output.append((comp, None))
@@ -123,36 +120,36 @@ def diff(left, right):
                 else:
                     different_content_lines.append(([], right_comp.contents[key]))
 
-        if len(different_content_lines) == 0 and len(different_components) == 0:
+        if not different_content_lines and not different_components:
             return None
-        else:
-            left = new_from_behavior(left_comp.name)
-            right = new_from_behavior(left_comp.name)
-            # add a UID, if one existed, despite the fact that they'll always be
-            # the same
-            uid = left_comp.get_child_value("uid")
-            if uid is not None:
-                left.add("uid").value = uid
-                right.add("uid").value = uid
 
-            for name, child_pair_list in different_components.items():
-                left_components, right_components = zip(*child_pair_list)
-                if len(left_components) > 0:
-                    # filter out None
-                    left.contents[name] = filter(None, left_components)
-                if len(right_components) > 0:
-                    # filter out None
-                    right.contents[name] = filter(None, right_components)
+        left = new_from_behavior(left_comp.name)
+        right = new_from_behavior(left_comp.name)
+        # add a UID, if one existed, despite the fact that they'll always be
+        # the same
+        uid = left_comp.get_child_value("uid")
+        if uid is not None:
+            left.add("uid").value = uid
+            right.add("uid").value = uid
 
-            for left_child_line, right_child_line in different_content_lines:
-                non_empty = left_child_line or right_child_line
-                name = non_empty[0].name
-                if left_child_line is not None:
-                    left.contents[name] = left_child_line
-                if right_child_line is not None:
-                    right.contents[name] = right_child_line
+        for name, child_pair_list in different_components.items():
+            left_components, right_components = zip(*child_pair_list)
+            if len(left_components) > 0:
+                # filter out None
+                left.contents[name] = filter(None, left_components)
+            if len(right_components) > 0:
+                # filter out None
+                right.contents[name] = filter(None, right_components)
 
-            return left, right
+        for left_child_line, right_child_line in different_content_lines:
+            non_empty = left_child_line or right_child_line
+            name = non_empty[0].name
+            if left_child_line is not None:
+                left.contents[name] = left_child_line
+            if right_child_line is not None:
+                right.contents[name] = right_child_line
+
+        return left, right
 
     vevents = process_component_lists(
         sort_by_uid(getattr(left, "vevent_list", [])), sort_by_uid(getattr(right, "vevent_list", []))

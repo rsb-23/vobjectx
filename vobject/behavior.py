@@ -77,7 +77,7 @@ class Behavior:
 
         """
         if not cls.allow_group and obj.group is not None:
-            err = "{0} has a group, but this object doesn't support groups".format(obj)
+            err = f"{obj} has a group, but this object doesn't support groups"
             raise VObjectError(err)
         if isinstance(obj, ContentLine):
             return cls.line_validate(obj, raise_exception, complain_unrecognized)
@@ -101,7 +101,7 @@ class Behavior:
                     return False
             return True
         else:
-            err = "{0} is not a Component or Contentline".format(obj)
+            err = f"{obj} is not a Component or Contentline"
             raise VObjectError(err)
 
     @classmethod
@@ -143,7 +143,6 @@ class Behavior:
     @classmethod
     def generate_implicit_parameters(cls, obj):
         """Generate any required information that don't yet exist."""
-        pass
 
     @classmethod
     def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):

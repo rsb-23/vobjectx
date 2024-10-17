@@ -8,7 +8,7 @@ from dateutil import tz
 
 import vobject
 
-version = "0.1"
+VERSION = "0.1"
 
 
 def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vobject.icalendar.utc):
@@ -41,16 +41,16 @@ def show_timezones():
 
 
 def convert_events(utc_only, args):
-    print("Converting {} events".format("only UTC" if utc_only else "all"))
+    print(f'Converting {"only UTC" if utc_only else "all"} events')
     ics_file = args[0]
     _tzone = args[1] if len(args) > 1 else "UTC"
 
-    print("... Reading {}".format(ics_file))
+    print(f"... Reading {ics_file}")
     cal = vobject.read_one(open(ics_file))
     change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz("UTC"), utc_only=utc_only)
 
-    out_name = "{}.converted".format(ics_file)
-    print("... Writing {}".format(out_name))
+    out_name = f"{ics_file}.converted"
+    print(f"... Writing {out_name}")
     with open(out_name, "wb") as out:
         cal.serialize(out)
 

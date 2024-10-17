@@ -27,17 +27,14 @@ class Name:
         """
         Turn a string or array value into a string.
         """
-        if type(val) in (list, tuple):
-            return " ".join(val)
-        return val
+        return " ".join(val) if type(val) in (list, tuple) else val
 
     def __str__(self):
         eng_order = ("prefix", "given", "additional", "family", "suffix")
-        out = " ".join(self.to_string(getattr(self, val)) for val in eng_order)
-        return out
+        return " ".join(self.to_string(getattr(self, val)) for val in eng_order)
 
     def __repr__(self):
-        return "<Name: {0!s}>".format(self.__str__())
+        return f"<Name: {self!s}>"
 
     def __eq__(self, other):
         try:
@@ -70,9 +67,7 @@ class Address:
         """
         Turn a string or array value into a string.
         """
-        if type(val) in (list, tuple):
-            return join_char.join(val)
-        return val
+        return join_char.join(val) if type(val) in (list, tuple) else val
 
     lines = ("box", "extended", "street")
     one_line = ("city", "region", "code")
@@ -86,7 +81,7 @@ class Address:
         return lines
 
     def __repr__(self):
-        return "<Address: {0!s}>".format(self)
+        return f"<Address: {self!s}>"
 
     def __eq__(self, other):
         try:
@@ -163,7 +158,7 @@ class VCardBehavior(behavior.Behavior):
     default_behavior = VCardTextBehavior
 
 
-class VCard3_0(VCardBehavior):
+class VCard3(VCardBehavior):
     """
     vCard 3.0 behavior.
     """
@@ -199,7 +194,7 @@ class VCard3_0(VCardBehavior):
             obj.add(ContentLine("VERSION", [], cls.version_string))
 
 
-register_behavior(VCard3_0, default=True)
+register_behavior(VCard3, default=True)
 
 
 class FN(VCardTextBehavior):
@@ -226,7 +221,7 @@ class GEO(VCardBehavior):
 register_behavior(GEO)
 
 
-wacky_apple_photo_serialize = True
+WACKY_APPLE_PHOTO_SERIALIZE = True
 REALLY_LARGE = 1e50
 
 
@@ -236,7 +231,7 @@ class Photo(VCardTextBehavior):
 
     @classmethod
     def value_repr(cls, line):
-        return " (BINARY PHOTO DATA at 0x{0!s}) ".format(id(line.value))
+        return f" (BINARY PHOTO DATA at 0x{id(line.value)!s}) "
 
     @classmethod
     def serialize(cls, obj, buf, line_length, validate, *args, **kwargs):
@@ -245,7 +240,7 @@ class Photo(VCardTextBehavior):
         base64 data to have very specific whitespace.  It seems Address Book
         can handle PHOTO if it's not wrapped, so don't wrap it.
         """
-        if wacky_apple_photo_serialize:
+        if WACKY_APPLE_PHOTO_SERIALIZE:
             line_length = REALLY_LARGE
         VCardTextBehavior.serialize(obj, buf, line_length, validate, *args, **kwargs)
 
@@ -255,10 +250,7 @@ register_behavior(Photo)
 
 def to_list_or_string(string):
     string_list = string_to_text_values(string)
-    if len(string_list) == 1:
-        return string_list[0]
-    else:
-        return string_list
+    return string_list[0] if len(string_list) == 1 else string_list
 
 
 def split_fields(string):
@@ -269,9 +261,7 @@ def split_fields(string):
 
 
 def to_list(string_or_list):
-    if isinstance(string_or_list, str):
-        return [string_or_list]
-    return string_or_list
+    return [string_or_list] if isinstance(string_or_list, str) else string_or_list
 
 
 def serialize_fields(obj, order=None):

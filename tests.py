@@ -262,7 +262,7 @@ class TestBehaviors(unittest.TestCase):
 
         # test get_behavior
         behavior = base.get_behavior("VCALENDAR")
-        self.assertEqual(str(behavior), "<class 'vobject.icalendar.VCalendar2_0'>")
+        self.assertEqual(str(behavior), "<class 'vobject.icalendar.VCalendar2'>")
         self.assertTrue(behavior.is_component)
 
         self.assertEqual(base.get_behavior("invalid_name"), None)

@@ -4,7 +4,7 @@ import codecs
 
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
-from .helper import get_buffer, logger
+from .helper import get_buffer, logger, split_by_size
 from .helper.imports_ import TextIO, contextlib, copy, lru_cache, re, sys
 
 
@@ -14,10 +14,7 @@ def to_unicode(value):
     If the argument is already a unicode string, it is returned
     unchanged.  Otherwise it must be a byte string and is decoded as utf8.
     """
-    if isinstance(value, str):
-        return value
-
-    return value.decode("utf-8")
+    return value if isinstance(value, str) else value.decode("utf-8")
 
 
 def to_basestring(s):
@@ -26,14 +23,10 @@ def to_basestring(s):
     If the argument is already a byte string, it is returned unchanged.
     Otherwise it must be a unicode string and is encoded as utf8.
     """
-    if isinstance(s, bytes):
-        return s
-
-    return s.encode("utf-8")
+    return s if isinstance(s, bytes) else s.encode("utf-8")
 
 
 # --------------------------------- Main classes -------------------------------
-# @dataclass
 class ContentDict(dict):
     def __setattr__(self, key, value):
         if type(value) is list:
@@ -70,7 +63,7 @@ class VBase:
     """
 
     def __init__(self, group=None, *args, **kwds):
-        super(VBase, self).__init__(*args, **kwds)
+        super().__init__(*args, **kwds)
         self.name = None
         self.group = group
         self.behavior = None
@@ -88,9 +81,7 @@ class VBase:
         """
         Call the behavior's validate method, or return True.
         """
-        if self.behavior:
-            return self.behavior.validate(self, *args, **kwds)
-        return True
+        return self.behavior.validate(self, *args, **kwds) if self.behavior else True
 
     def get_children(self):
         """
@@ -147,24 +138,23 @@ class VBase:
         """
         if self.is_native or not self.behavior or not self.behavior.has_native:
             return self
-        else:
-            self_orig = copy.copy(self)
-            try:
-                return self.behavior.transform_to_native(self)
-            except Exception as e:  # TODO: handle properly
-                print("Critical error")
-                # wrap errors in transformation in a ParseError
-                line_number = getattr(self, "line_number", None)
 
-                if isinstance(e, ParseError):
-                    if line_number is not None:
-                        e.line_number = line_number
-                    raise
-                else:
-                    msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
-                    msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
-                    msg = msg + " (" + str(self_orig) + ")"
-                    raise ParseError(msg, line_number)
+        self_orig = copy.copy(self)
+        try:
+            return self.behavior.transform_to_native(self)
+        except VObjectError as e:
+            # wrap errors in transformation in a ParseError
+            line_number = getattr(self, "line_number", None)
+
+            if isinstance(e, ParseError):
+                if line_number is not None:
+                    e.line_number = line_number
+                raise
+            else:
+                msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
+                msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
+                msg = f"{msg} ({str(self_orig)})"
+                raise ParseError(msg, line_number) from e
 
     def transform_from_native(self):
         """
@@ -179,34 +169,32 @@ class VBase:
         perfect inverse of transform_to_native, in such cases transform_from_native
         should return a new object, not self after modifications.
         """
-        if self.is_native and self.behavior and self.behavior.has_native:
-            try:
-                return self.behavior.transform_from_native(self)
-            except Exception as e:
-                # wrap errors in transformation in a NativeError
-                line_number = getattr(self, "line_number", None)
-                if isinstance(e, NativeError):
-                    if line_number is not None:
-                        e.line_number = line_number
-                    raise
-                else:
-                    msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
-                    msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
-                    raise NativeError(msg, line_number)
-        else:
+        if not self.is_native or not self.behavior or not self.behavior.has_native:
             return self
+
+        try:
+            return self.behavior.transform_from_native(self)
+        except VObjectError as e:
+            # wrap errors in transformation in a NativeError
+            line_number = getattr(self, "line_number", None)
+            if isinstance(e, NativeError):
+                if line_number is not None:
+                    e.line_number = line_number
+                raise
+            else:
+                msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
+                msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
+                raise NativeError(msg, line_number) from e
 
     def transform_children_to_native(self):
         """
         Recursively replace children with their native representation.
         """
-        pass
 
     def transform_children_from_native(self, clear_behavior=True):
         """
         Recursively transform native children to vanilla representations.
         """
-        pass
 
     def serialize(self, buf=None, line_length=75, validate=True, behavior=None, *args, **kwargs):
         """
@@ -272,7 +260,7 @@ class ContentLine(VBase):
 
         Group is used as a positional argument to match parse_line's return
         """
-        super(ContentLine, self).__init__(group, *args, **kwds)
+        super().__init__(group, *args, **kwds)
 
         self.name = name.upper()
         self.encoded = encoded
@@ -320,7 +308,7 @@ class ContentLine(VBase):
         return newcopy
 
     def copy(self, copyit):
-        super(ContentLine, self).copy(copyit)
+        super().copy(copyit)
         self.name = copyit.name
         self.value = copy.copy(copyit.value)
         self.encoded = self.encoded
@@ -331,10 +319,7 @@ class ContentLine(VBase):
         self.line_number = copyit.line_number
 
     def __eq__(self, other):
-        try:
-            return (self.name == other.name) and (self.params == other.params) and (self.value == other.value)
-        except Exception:
-            return False
+        return (self.name == other.name) and (self.params == other.params) and (self.value == other.value)
 
     def __getattr__(self, name):
         """
@@ -350,8 +335,8 @@ class ContentLine(VBase):
                 return self.params[to_vname(name, 10, True)]
             else:
                 raise AttributeError(name)
-        except KeyError:
-            raise AttributeError(name)
+        except KeyError as e:
+            raise AttributeError(name) from e
 
     def __setattr__(self, name, value):
         """
@@ -385,36 +370,35 @@ class ContentLine(VBase):
                 del self.params[to_vname(name, 10, True)]
             else:
                 object.__delattr__(self, name)
-        except KeyError:
-            raise AttributeError(name)
+        except KeyError as e:
+            raise AttributeError(name) from e
 
     def value_repr(self):
         """
         Transform the representation of the value
         according to the behavior, if any.
         """
-        v = self.value
-        if self.behavior:
-            v = self.behavior.value_repr(self)
-        return v
+        return self.behavior.value_repr(self) if self.behavior else self.value
 
     def __str__(self):
         try:
-            return "<{0}{1}{2}>".format(self.name, self.params, self.value_repr())
+            value_repr = self.value_repr()
         except UnicodeEncodeError:
-            return "<{0}{1}{2}>".format(self.name, self.params, self.value_repr().encode("utf-8"))
+            value_repr = self.value_repr().encode("utf-8")
+
+        return f"<{self.name}{self.params}{value_repr}>"
 
     def __repr__(self):
         return self.__str__()
 
     def __unicode__(self):
-        return "<{0}{1}{2}>".format(self.name, self.params, self.value_repr())
+        return f"<{self.name}{self.params}{self.value_repr()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
-        print(pre, self.name + ":", self.value_repr())
+        print(pre, f"{self.name}:", self.value_repr())
         if self.params:
-            print(pre, "params for ", self.name + ":")
+            print(pre, "params for ", f"{self.name}:")
             for k in self.params.keys():
                 print(pre + " " * tabwidth, k, self.params[k])
 
@@ -439,7 +423,7 @@ class Component(VBase):
     """
 
     def __init__(self, name=None, *args, **kwds):
-        super(Component, self).__init__(*args, **kwds)
+        super().__init__(*args, **kwds)
         self.contents = ContentDict()
         if name:
             self.name = name.upper()
@@ -457,7 +441,7 @@ class Component(VBase):
         return newcopy
 
     def copy(self, copyit):
-        super(Component, self).copy(copyit)
+        super().copy(copyit)
 
         # deep copy of contents
         self.contents = ContentDict()
@@ -480,7 +464,7 @@ class Component(VBase):
         if self.name or self.use_begin:
             if self.name == name:
                 return
-            raise VObjectError("This component already has a PROFILE or " "uses BEGIN.")
+            raise VObjectError("This component already has a PROFILE or uses BEGIN.")
         self.name = name.upper()
 
     def __getattr__(self, name):
@@ -499,8 +483,8 @@ class Component(VBase):
                 return self.contents[to_vname(name, 5)]
             else:
                 return self.contents[to_vname(name)][0]
-        except KeyError:
-            raise AttributeError(name)
+        except KeyError as e:
+            raise AttributeError(name) from e
 
     def __setattr__(self, name, value):
         """
@@ -520,10 +504,7 @@ class Component(VBase):
         Return a child's value (the first, by default), or None.
         """
         child = self.contents.get(to_vname(child_name))
-        if child is None:
-            return default
-        else:
-            return child[child_number].value
+        return default if child is None else child[child_number].value
 
     def add(self, obj_or_name, group=None):
         """
@@ -574,8 +555,7 @@ class Component(VBase):
         Return an iterable of all children.
         """
         for obj_list in self.contents.values():
-            for obj in obj_list:
-                yield obj
+            yield from obj_list
 
     def components(self):
         """
@@ -592,7 +572,7 @@ class Component(VBase):
     def sort_child_keys(self):
         try:
             first = [s for s in self.behavior.sort_first if s in self.contents]
-        except Exception:
+        except AttributeError:
             first = []
         return first + sorted(k for k in self.contents.keys() if k not in first)
 
@@ -632,9 +612,9 @@ class Component(VBase):
 
     def __str__(self):
         if self.name:
-            return "<{0}| {1}>".format(self.name, self.get_sorted_children())
+            return f"<{self.name}| {self.get_sorted_children()}>"
         else:
-            return "<*unnamed*| {0}>".format(self.get_sorted_children())
+            return f"<*unnamed*| {self.get_sorted_children()}>"
 
     def __repr__(self):
         return self.__str__()
@@ -740,7 +720,7 @@ def parse_line(line, line_number=None):
     """
     match = line_re.match(line)
     if match is None:
-        raise ParseError("Failed to parse line: {0!s}".format(line), line_number)
+        raise ParseError(f"Failed to parse line: {line!s}", line_number)
     # Underscores are replaced with dash to work around Lotus Notes
     return (
         match.group("name").replace("_", "-"),
@@ -753,7 +733,7 @@ def parse_line(line, line_number=None):
 # logical line regular expressions
 
 patterns["lineend"] = r"(?:\r\n|\r|\n|$)"
-patterns["wrap"] = r"{lineend!s} [\t ]".format(**patterns)
+patterns["wrap"] = rf"{patterns['lineend']!s} [\t ]"
 patterns["logicallines"] = (
     r"""
 (
@@ -770,7 +750,7 @@ patterns["wraporend"] = r"({wrap!s} | {lineend!s} )".format(**patterns)
 wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
 logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
 
-test_lines = """
+TEST_LINES = """
 Line 0 text
  , Line 0 continued.
 Line 1;encoding=quoted-printable:this is an evil=
@@ -793,9 +773,9 @@ def get_logical_lines(fp, allow_qp=True):
 
     # We're leaving this test in for awhile, because the unittest was ugly and dumb.
     >>> from io import StringIO
-    >>> f=StringIO(test_lines)
-    >>> for n, l in enumerate(get_logical_lines(f)):
-    ...     print("Line %s: %s" % (n, l[0]))
+    >>> f=StringIO(TEST_LINES)
+    >>> for num, line_ in enumerate(get_logical_lines(f)):
+    ...     print("Line %s: %s" % (num, line_[0]))
     ...
     Line 0: Line 0 text, Line 0 continued.
     Line 1: Line 1;encoding=quoted-printable:this is an evil=
@@ -822,9 +802,9 @@ def get_logical_lines(fp, allow_qp=True):
             line = fp.readline()
             if line == "":
                 break
-            else:
-                line = line.rstrip(Char.CRLF)
-                line_number += 1
+            line = line.rstrip(Char.CRLF)
+            line_number += 1
+
             if line.rstrip() == "":
                 if logical_line.tell() > 0:
                     yield logical_line.getvalue(), line_start_number
@@ -866,11 +846,11 @@ def dquote_escape(param):
     """
     Return param, or "param" if ',' or ';' or ':' is in param.
     """
-    if param.find('"') >= 0:
+    if '"' in param:
         raise VObjectError("Double quotes aren't allowed in parameter values.")
-    for char in ",;:":
-        if param.find(char) >= 0:
-            return '"' + param + '"'
+    for char in ",;:":  # sourcery skip # temp
+        if char in param:
+            return f'"{param}"'
     return param
 
 
@@ -878,46 +858,11 @@ def fold_one_line(outbuf: TextIO, input_: str, line_length=75):
     """
     Folding line procedure that ensures multi-byte utf-8 sequences are not
     broken across lines
-
-    TO-DO: This all seems odd. Is it still needed, especially in python3?
     """
-    if len(input_) < line_length:
-        # Optimize for unfolded line case
-        try:
-            outbuf.write(bytes(input_, "UTF-8"))
-        except Exception:
-            # fall back on py2 syntax
-            outbuf.write(input_)
-
-    else:
-        # Look for valid utf8 range and write that out
-        start = 0
-        written = 0
-        counter = 0  # counts line size in bytes
-        decoded = to_unicode(input_)
-        length = len(to_basestring(input_))
-        while written < length:
-            s = decoded[start]  # take one char
-            size = len(to_basestring(s))  # calculate it's size in bytes
-            if counter + size > line_length:
-                try:
-                    outbuf.write(bytes("\r\n ", "UTF-8"))
-                except Exception:
-                    # fall back on py2 syntax
-                    outbuf.write("\r\n ")
-
-                counter = 1  # one for space
-
-            outbuf.write(to_unicode(s))
-
-            written += size
-            counter += size
-            start += 1
-    try:
-        outbuf.write(bytes("\r\n", "UTF-8"))
-    except Exception:
-        # fall back on py2 syntax
-        outbuf.write("\r\n")
+    chunks = split_by_size(input_, byte_size=line_length)
+    for chunk in chunks:
+        outbuf.write(chunk)
+    outbuf.write("\r\n")
 
 
 def default_serialize(obj, buf, line_length):
@@ -927,17 +872,14 @@ def default_serialize(obj, buf, line_length):
     outbuf = buf or get_buffer()
 
     if isinstance(obj, Component):
-        if obj.group is None:
-            group_string = ""
-        else:
-            group_string = obj.group + "."
+        group_string = "" if obj.group is None else f"{obj.group}."
         if obj.use_begin:
-            fold_one_line(outbuf, "{0}BEGIN:{1}".format(group_string, obj.name), line_length)
+            fold_one_line(outbuf, f"{group_string}BEGIN:{obj.name}", line_length)
         for child in obj.get_sorted_children():
             # validate is recursive, we only need to validate once
             child.serialize(outbuf, line_length, validate=False)
         if obj.use_begin:
-            fold_one_line(outbuf, "{0}END:{1}".format(group_string, obj.name), line_length)
+            fold_one_line(outbuf, f"{group_string}END:{obj.name}", line_length)
 
     elif isinstance(obj, ContentLine):
         started_encoded = obj.encoded
@@ -947,19 +889,19 @@ def default_serialize(obj, buf, line_length):
         s = get_buffer()
 
         if obj.group is not None:
-            s.write(obj.group + ".")
+            s.write(f"{obj.group}.")
         s.write(obj.name.upper())
         keys = sorted(obj.params.keys())
         for key in keys:
             paramstr = ",".join(dquote_escape(p) for p in obj.params[key])
             try:
-                s.write(";{0}={1}".format(key, paramstr))
+                s.write(f";{key}={paramstr}")
             except (UnicodeDecodeError, UnicodeEncodeError):
-                s.write(";{0}={1}".format(key, paramstr.encode("utf-8")))
+                s.write(f";{key}={paramstr.encode('utf-8')}")
         try:
-            s.write(":{0}".format(obj.value))
+            s.write(f":{obj.value}")
         except (UnicodeDecodeError, UnicodeEncodeError):
-            s.write(":{0}".format(obj.value.encode("utf-8")))
+            s.write(f":{obj.value.encode('utf-8')}")
         if obj.behavior and not started_encoded:
             obj.behavior.decode(obj)
         fold_one_line(outbuf, s.getvalue(), line_length)
@@ -975,16 +917,10 @@ class Stack:
         return len(self.stack)
 
     def top(self):
-        if len(self) == 0:
-            return None
-        else:
-            return self.stack[-1]
+        return self.stack[-1] if self.stack else None
 
     def top_name(self):
-        if len(self) == 0:
-            return None
-        else:
-            return self.stack[-1].name
+        return self.stack[-1].name if self.stack else None
 
     def modify_top(self, item):
         top = self.top()
@@ -1067,7 +1003,7 @@ def read_components(stream_or_string, validate=False, transform=True, ignore_unr
             if stack.top_name() is None:
                 logger.warning("Top level component was never named")
             elif stack.top().use_begin:
-                raise ParseError("Component {0!s} was never closed".format((stack.top_name())), n)
+                raise ParseError(f"Component {(stack.top_name())!s} was never closed", n)
             yield stack.pop()
 
     except ParseError as e:
