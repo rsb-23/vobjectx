@@ -123,33 +123,32 @@ def diff(left, right):
         if not different_content_lines and not different_components:
             return None
 
-        left = new_from_behavior(left_comp.name)
-        right = new_from_behavior(left_comp.name)
-        # add a UID, if one existed, despite the fact that they'll always be
-        # the same
+        _left = new_from_behavior(left_comp.name)
+        _right = new_from_behavior(left_comp.name)
+        # add a UID, if one existed, despite the fact that they'll always be the same
         uid = left_comp.get_child_value("uid")
         if uid is not None:
-            left.add("uid").value = uid
-            right.add("uid").value = uid
+            _left.add("uid").value = uid
+            _right.add("uid").value = uid
 
         for name, child_pair_list in different_components.items():
             left_components, right_components = zip(*child_pair_list)
             if len(left_components) > 0:
                 # filter out None
-                left.contents[name] = filter(None, left_components)
+                _left.contents[name] = filter(None, left_components)
             if len(right_components) > 0:
                 # filter out None
-                right.contents[name] = filter(None, right_components)
+                _right.contents[name] = filter(None, right_components)
 
         for left_child_line, right_child_line in different_content_lines:
             non_empty = left_child_line or right_child_line
             name = non_empty[0].name
             if left_child_line is not None:
-                left.contents[name] = left_child_line
+                _left.contents[name] = left_child_line
             if right_child_line is not None:
-                right.contents[name] = right_child_line
+                _right.contents[name] = right_child_line
 
-        return left, right
+        return _left, _right
 
     vevents = process_component_lists(
         sort_by_uid(getattr(left, "vevent_list", [])), sort_by_uid(getattr(right, "vevent_list", []))

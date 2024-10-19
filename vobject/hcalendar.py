@@ -39,7 +39,7 @@ class HCalendar(VCalendar2_0):
     name = "HCALENDAR"
 
     @classmethod
-    def serialize(cls, obj, buf=None, line_length=None, validate=True):
+    def serialize(cls, obj, buf=None, line_length=None, validate=True, *args, **kwargs):
         """
         Serialize iCalendar to HTML using the hCalendar microformat (http://microformats.org/wiki/hcalendar)
         """

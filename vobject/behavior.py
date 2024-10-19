@@ -122,8 +122,8 @@ class Behavior:
         if not line.encoded:
             line.encoded = 1
 
-    @classmethod
-    def transform_to_native(cls, obj):
+    @staticmethod
+    def transform_to_native(obj):
         """
         Turn a ContentLine or Component into a Python-native representation.
 
@@ -133,15 +133,15 @@ class Behavior:
         """
         return obj
 
-    @classmethod
-    def transform_from_native(cls, obj):
+    @staticmethod
+    def transform_from_native(obj):
         """
         Inverse of transform_to_native.
         """
         raise NativeError("No transform_from_native defined")
 
-    @classmethod
-    def generate_implicit_parameters(cls, obj):
+    @staticmethod
+    def generate_implicit_parameters(obj):
         """Generate any required information that don't yet exist."""
 
     @classmethod

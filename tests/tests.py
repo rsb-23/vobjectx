@@ -452,7 +452,6 @@ class TestVcards(unittest.TestCase):
         Default behavior test.
         """
         card = self.card
-        print(card)
         self.assertEqual(base.get_behavior("note"), None)
         self.assertEqual(
             str(card.note.value), "The Mayor of the great city of Goerlitz in the great country of Germany.\nNext line."

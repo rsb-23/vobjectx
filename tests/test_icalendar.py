@@ -219,14 +219,18 @@ class TestIcalendar(TestCase):
 
         self.assertEqual(vcal.serialize().replace("\r\n", "\n"), test_cal.replace("\r\n", "\n"))
 
+    @staticmethod
+    def get_dates_of_first_component(arg0):
+        test_file = get_test_file(arg0)
+        cal = base.read_one(test_file)
+        return list(cal.vevent.rruleset)
+
     def test_recurrence(self):
         """
         Ensure date valued UNTILs in rrules are in a reasonable timezone,
         and include that day (12/28 in this test)
         """
-        test_file = get_test_file("recurrence.ics")  # sourcery skip
-        cal = base.read_one(test_file)
-        dates = list(cal.vevent.getrruleset())
+        dates = self.get_dates_of_first_component("recurrence.ics")
         self.assertEqual(dates[0], dt.datetime(2006, 1, 26, 23, 0, tzinfo=tzutc()))
         self.assertEqual(dates[1], dt.datetime(2006, 2, 23, 23, 0, tzinfo=tzutc()))
         self.assertEqual(dates[-1], dt.datetime(2006, 12, 28, 23, 0, tzinfo=tzutc()))
@@ -263,9 +267,7 @@ class TestIcalendar(TestCase):
         )
 
     def _recurrence_test(self, file_name):
-        test_file = get_test_file(file_name)
-        cal = base.read_one(test_file)
-        dates = list(cal.vevent.getrruleset())
+        dates = self.get_dates_of_first_component(file_name)
         self.assertEqual(dates[0], dt.datetime(2013, 1, 17, 0, 0))
         self.assertEqual(dates[1], dt.datetime(2013, 1, 24, 0, 0))
         self.assertEqual(dates[-1], dt.datetime(2013, 3, 28, 0, 0))

@@ -83,9 +83,11 @@ from .base import new_from_behavior, read_components, read_one
 VERSION = "0.9.9"
 
 
+# noinspection PyPep8Naming
 def iCalendar():
     return new_from_behavior("vcalendar", "2.0")
 
 
+# noinspection PyPep8Naming
 def vCard():
     return new_from_behavior("vcard", "3.0")
