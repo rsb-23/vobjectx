@@ -602,10 +602,7 @@ class Component(VBase):
                     child.parent_behavior = None
 
     def __repr__(self):
-        if self.name:
-            return f"<{self.name}| {self.get_sorted_children()}>"
-        else:
-            return f"<*unnamed*| {self.get_sorted_children()}>"
+        return f"<{self.name or '*unnamed*'}| {self.get_sorted_children()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth

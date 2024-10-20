@@ -1,11 +1,8 @@
 """Definitions and behavior for vCard 3.0"""
 
-import codecs
-
 from . import behavior
 from .base import ContentLine, register_behavior
-from .exceptions import AllException
-from .helper import backslash_escape, byte_decoder
+from .helper import backslash_escape, byte_decoder, byte_encoder
 from .icalendar import string_to_text_values
 
 # ------------------------ vCard structs ---------------------------------------
@@ -45,7 +42,7 @@ class Name:
                 and self.prefix == other.prefix
                 and self.suffix == other.suffix
             )
-        except AllException:
+        except AttributeError:
             return False
 
 
@@ -94,7 +91,7 @@ class Address:
                 and self.code == other.code
                 and self.country == other.country
             )
-        except AllException:
+        except AttributeError:
             return False
 
 
@@ -142,9 +139,9 @@ class VCardTextBehavior(behavior.Behavior):
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
                 if isinstance(line.value, bytes):
-                    line.value = codecs.encode(line.value, "base64").decode("utf-8").replace("\n", "")
+                    line.value = byte_encoder(line.value).decode("utf-8").replace("\n", "")
                 else:
-                    line.value = codecs.encode(line.value.encode(encoding), "base64").decode("utf-8")
+                    line.value = byte_encoder(line.value.encode(encoding)).decode("utf-8")
             else:
                 line.value = backslash_escape(line.value)
             line.encoded = True
@@ -216,7 +213,6 @@ class GEO(VCardBehavior):
 
 
 register_behavior(GEO)
-
 
 WACKY_APPLE_PHOTO_SERIALIZE = True
 REALLY_LARGE = 1e50

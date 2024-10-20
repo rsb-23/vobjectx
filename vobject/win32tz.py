@@ -1,6 +1,7 @@
 import datetime
 import struct
 import winreg  # noqa : available in py39-py311
+from operator import itemgetter
 
 handle = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
 tzparent = winreg.OpenKey(handle, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones")
@@ -16,21 +17,7 @@ def list_timezones():
 
 
 class Win32tz(datetime.tzinfo):
-    """tzinfo class based on win32's timezones available in the registry.
-
-    >>> local = Win32tz('Central Standard Time')
-    >>> oct1 = datetime.datetime(month=10, year=2004, day=1, tzinfo=local)
-    >>> dec1 = datetime.datetime(month=12, year=2004, day=1, tzinfo=local)
-    >>> oct1.dst()
-    datetime.timedelta(0, 3600)
-    >>> dec1.dst()
-    datetime.timedelta(0)
-    >>> braz = Win32tz('E. South America Standard Time')
-    >>> braz.dst(oct1)
-    datetime.timedelta(0)
-    >>> braz.dst(dec1)
-    datetime.timedelta(0, 3600)
-    """
+    """tzinfo class based on win32's timezones available in the registry."""
 
     def __init__(self, name):
         self.data = Win32tzData(name)
@@ -78,29 +65,20 @@ class Win32tzData:
         """Load path, or if path is empty, load local time."""
         if path:
             keydict = values_to_dict(winreg.OpenKey(tzparent, path))
-            self.display = keydict["Display"]
-            self.dstname = keydict["Dlt"]
-            self.stdname = keydict["Std"]
+            self.display, self.dstname, self.stdname = itemgetter("Display", "Dlt", "Std")(keydict)
 
-            # see http://wwwinreg.jsiinc.com/SUBA/tip0300/rh0398.htm
-            tup = struct.unpack("=3l16h", keydict["TZI"])
-            self.stdoffset = -tup[0] - tup[1]  # Bias + StandardBias * -1
-            self.dstoffset = self.stdoffset - tup[2]  # + DaylightBias * -1
+            # see http://ww_winreg.jsiinc.com/SUBA/tip0300/rh0398.htm
+            std_tup = dst_tup = struct.unpack("=3l16h", keydict["TZI"])
+            self.stdoffset = -std_tup[0] - std_tup[1]  # Bias + StandardBias * -1
+            self.dstoffset = self.stdoffset - std_tup[2]  # + DaylightBias * -1
 
-            offset = 3
-            self.stdmonth = tup[1 + offset]
-            self.stddayofweek = tup[2 + offset]  # Sunday=0
-            self.stdweeknumber = tup[3 + offset]  # Last = 5
-            self.stdhour = tup[4 + offset]
-            self.stdminute = tup[5 + offset]
-
-            offset = 11
+            std_offset = 3
+            dst_offset = 11
 
         else:
             keydict = values_to_dict(localkey)
 
-            self.stdname = keydict["StandardName"]
-            self.dstname = keydict["DaylightName"]
+            self.stdname, self.dstname = itemgetter("StandardName", "DaylightName")(keydict)
 
             sourcekey = winreg.OpenKey(tzparent, self.stdname)
             self.display = values_to_dict(sourcekey)["Display"]
@@ -109,22 +87,18 @@ class Win32tzData:
             self.dstoffset = self.stdoffset - keydict["DaylightBias"]
 
             # see http://wwwinreg.jsiinc.com/SUBA/tip0300/rh0398.htm
-            tup = struct.unpack("=8h", keydict["StandardStart"])
+            std_tup = struct.unpack("=8h", keydict["StandardStart"])
+            dst_tup = struct.unpack("=8h", keydict["DaylightStart"])
+            std_offset = dst_offset = 0
 
-            offset = 0
-            self.stdmonth = tup[1 + offset]
-            self.stddayofweek = tup[2 + offset]  # Sunday=0
-            self.stdweeknumber = tup[3 + offset]  # Last = 5
-            self.stdhour = tup[4 + offset]
-            self.stdminute = tup[5 + offset]
+        # Sunday=0th day of week # Last week number = 5
+        self.stdmonth, self.stddayofweek, self.stdweeknumber, self.stdhour, self.stdminute = next_5(std_tup, std_offset)
+        self.dstmonth, self.dstdayofweek, self.dstweeknumber, self.dsthour, self.dstminute = next_5(dst_tup, dst_offset)
 
-            tup = struct.unpack("=8h", keydict["DaylightStart"])
 
-        self.dstmonth = tup[1 + offset]
-        self.dstdayofweek = tup[2 + offset]  # Sunday=0
-        self.dstweeknumber = tup[3 + offset]  # Last = 5
-        self.dsthour = tup[4 + offset]
-        self.dstminute = tup[5 + offset]
+def next_5(items, offset=0):
+    """Returns next 5 item after 'offset'."""
+    return items[offset + 1 : offset + 6]
 
 
 def values_to_dict(key):
