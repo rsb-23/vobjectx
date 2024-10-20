@@ -80,7 +80,7 @@ from . import icalendar, vcard
 from .base import new_from_behavior, read_components, read_one
 
 # Package version
-VERSION = "0.9.9"
+VERSION = "0.1.0"
 
 
 # noinspection PyPep8Naming

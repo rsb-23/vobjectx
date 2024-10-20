@@ -1,7 +1,7 @@
 """Definitions and behavior for vCard 3.0"""
 
-from . import behavior
 from .base import ContentLine, register_behavior
+from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder
 from .icalendar import string_to_text_values
 
@@ -98,7 +98,7 @@ class Address:
 # ------------------------ Registered Behavior subclasses ----------------------
 
 
-class VCardTextBehavior(behavior.Behavior):
+class VCardTextBehavior(Behavior):
     """
     Provide backslash escape encoding/decoding for single valued properties.
 
@@ -147,7 +147,7 @@ class VCardTextBehavior(behavior.Behavior):
             line.encoded = True
 
 
-class VCardBehavior(behavior.Behavior):
+class VCardBehavior(Behavior):
     allow_group = True
     default_behavior = VCardTextBehavior
 

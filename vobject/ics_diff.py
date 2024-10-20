@@ -4,9 +4,7 @@ Compares VTODOs and VEVENTs in two iCalendar sources.
 
 from argparse import ArgumentParser
 
-import vobject
-
-from .base import new_from_behavior, read_one
+import vobject as vo
 
 
 def get_sort_key(component):
@@ -105,7 +103,7 @@ def diff(left, right):
 
         for key in left_child_keys:
             right_list = right_comp.contents.get(key, [])
-            if isinstance(left_comp.contents[key][0], vobject.base.Component):
+            if isinstance(left_comp.contents[key][0], vo.base.Component):
                 comp_difference = process_component_lists(left_comp.contents[key], right_list)
                 if len(comp_difference) > 0:
                     different_components[key] = comp_difference
@@ -115,7 +113,7 @@ def diff(left, right):
 
         for key in right_child_keys:
             if key not in left_child_keys:
-                if isinstance(right_comp.contents[key][0], vobject.base.Component):
+                if isinstance(right_comp.contents[key][0], vo.base.Component):
                     different_components[key] = ([], right_comp.contents[key])
                 else:
                     different_content_lines.append(([], right_comp.contents[key]))
@@ -123,8 +121,8 @@ def diff(left, right):
         if not different_content_lines and not different_components:
             return None
 
-        _left = new_from_behavior(left_comp.name)
-        _right = new_from_behavior(left_comp.name)
+        _left = vo.new_from_behavior(left_comp.name)
+        _right = vo.new_from_behavior(left_comp.name)
         # add a UID, if one existed, despite the fact that they'll always be the same
         uid = left_comp.get_child_value("uid")
         if uid is not None:
@@ -176,7 +174,7 @@ def get_options():
     # Configuration options #
     usage = "usage: %prog [options] ics_file1 ics_file2"
     parser = ArgumentParser(usage=usage, description="ics_diff will print a comparison of two iCalendar files ")
-    parser.add_argument("--version", action="version", version=vobject.VERSION)
+    parser.add_argument("--version", action="version", version=vo.VERSION)
     parser.add_argument(
         "-i",
         "--ignore-dtstamp",
@@ -201,8 +199,8 @@ def main():
         ignore_dtstamp = options.ignore
         ics_file1, ics_file2 = args
         with open(ics_file1) as f, open(ics_file2) as g:
-            cal1 = read_one(f)
-            cal2 = read_one(g)
+            cal1 = vo.read_one(f)
+            cal2 = vo.read_one(g)
         delete_extraneous(cal1, ignore_dtstamp=ignore_dtstamp)
         delete_extraneous(cal2, ignore_dtstamp=ignore_dtstamp)
         pretty_diff(cal1, cal2)

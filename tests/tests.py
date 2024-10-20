@@ -6,10 +6,18 @@ import unittest
 import dateutil
 from dateutil.tz import tzutc
 
-from vobject import base, iCalendar
+from vobject import iCalendar
 from vobject.base import ContentLine, ParseError
 from vobject.base import __behavior_registry as behavior_registry
-from vobject.base import parse_line, read_components, text_line_to_content_line
+from vobject.base import (
+    get_behavior,
+    new_from_behavior,
+    parse_line,
+    parse_params,
+    read_components,
+    read_one,
+    text_line_to_content_line,
+)
 from vobject.change_tz import change_tz
 from vobject.icalendar import MultiDateBehavior, PeriodBehavior
 
@@ -28,7 +36,7 @@ class TestCalendarSerializing(unittest.TestCase):
         CreateCalendar 2.0 format from scratch
         """
         test_cal = get_test_file("simple_2_0_test.ics")
-        cal = base.new_from_behavior("vcalendar", "2.0")
+        cal = new_from_behavior("vcalendar", "2.0")
         cal.add("vevent")
         cal.vevent.add("dtstart").value = dt.datetime(2006, 5, 9)
         cal.vevent.add("description").value = "Test event"
@@ -50,8 +58,8 @@ class TestCalendarSerializing(unittest.TestCase):
         """
 
         def common_checks(test_cal_):
-            vevent = base.read_one(test_cal_).vevent
-            vevent2 = base.read_one(vevent.serialize())
+            vevent = read_one(test_cal_).vevent
+            vevent2 = read_one(vevent.serialize())
             self.assertEqual(str(vevent), str(vevent2))
             self.assertEqual(vevent.summary.value, "The title こんにちはキティ")
 
@@ -63,8 +71,8 @@ class TestCalendarSerializing(unittest.TestCase):
         Should support input file with a long text field covering multiple lines
         """
         test_journal = get_test_file("journal.ics")
-        vobj = base.read_one(test_journal)
-        vjournal = base.read_one(vobj.serialize())
+        vobj = read_one(test_journal)
+        vjournal = read_one(vobj.serialize())
         self.assertTrue("Joe, Lisa, and Bob" in vjournal.description.value)
         self.assertTrue("Tuesday.\n2." in vjournal.description.value)
 
@@ -72,7 +80,7 @@ class TestCalendarSerializing(unittest.TestCase):
         """
         Multi-text serialization test
         """
-        category = base.new_from_behavior("categories")
+        category = new_from_behavior("categories")
         category.value = ["Random category"]
         self.assertEqual(category.serialize().strip(), "CATEGORIES:Random category")
 
@@ -83,7 +91,7 @@ class TestCalendarSerializing(unittest.TestCase):
         """
         Semi-colon separated multi-text serialization test
         """
-        request_status = base.new_from_behavior("request-status")
+        request_status = new_from_behavior("request-status")
         request_status.value = ["5.1", "Service unavailable"]
         self.assertEqual(request_status.serialize().strip(), "REQUEST-STATUS:5.1;Service unavailable")
 
@@ -115,7 +123,7 @@ class TestCalendarSerializing(unittest.TestCase):
 
 
         tzs = dateutil.tz.tzical("test_files/timezones.ics")
-        cal = base.new_from_behavior('hcalendar')
+        cal = new_from_behavior('hcalendar')
         self.assertEqual(
             str(cal.behavior),
             "<class 'vobject.hcalendar.HCalendar'>"
@@ -226,13 +234,13 @@ class TestBehaviors(unittest.TestCase):
         )
 
         # test get_behavior
-        behavior = base.get_behavior("VCALENDAR")
+        behavior = get_behavior("VCALENDAR")
         self.assertEqual(str(behavior), "<class 'vobject.icalendar.VCalendar2'>")
         self.assertTrue(behavior.is_component)
 
-        self.assertEqual(base.get_behavior("invalid_name"), None)
+        self.assertEqual(get_behavior("invalid_name"), None)
         # test for ContentLine (not a component)
-        non_component_behavior = base.get_behavior("RDATE")
+        non_component_behavior = get_behavior("RDATE")
         self.assertFalse(non_component_behavior.is_component)
 
     def test_MultiDateBehavior(self):
@@ -284,11 +292,11 @@ class TestVTodo(unittest.TestCase):
         Test VTodo
         """
         vtodo = get_test_file("vtodo.ics")
-        obj = base.read_one(vtodo)
+        obj = read_one(vtodo)
         obj.vtodo.add("completed")
         obj.vtodo.completed.value = dt.datetime(2015, 5, 5, 13, 30)
         self.assertEqual(obj.vtodo.completed.serialize()[:23], "COMPLETED:20150505T1330")
-        obj = base.read_one(obj.serialize())
+        obj = read_one(obj.serialize())
         self.assertEqual(obj.vtodo.completed.value, dt.datetime(2015, 5, 5, 13, 30))
 
 
@@ -361,7 +369,7 @@ class TestGeneralFileParsing(unittest.TestCase):
         Test reading first component of ics
         """
         cal = get_test_file("silly_test.ics")
-        silly = base.read_one(cal)
+        silly = read_one(cal)
         self.assertEqual(
             str(silly),
             "<SILLYPROFILE| [<MORESTUFF{}this line is not folded, but in practice probably ought to be, as it is"
@@ -374,7 +382,7 @@ class TestGeneralFileParsing(unittest.TestCase):
         Test importing ics
         """
         cal = get_test_file("standard_test.ics")
-        c = base.read_one(cal, validate=True)
+        c = read_one(cal, validate=True)
         self.assertEqual(str(c.vevent.valarm.trigger), "<TRIGGER{}-1 day, 0:00:00>")
 
         self.assertEqual(str(c.vevent.dtstart.value), "2002-10-28 14:00:00-08:00")
@@ -391,25 +399,25 @@ class TestGeneralFileParsing(unittest.TestCase):
         Test bad ics stream
         """
         cal = get_test_file("badstream.ics")
-        self.assertRaises(ParseError, base.read_one, cal)
+        self.assertRaises(ParseError, read_one, cal)
 
     def test_bad_line(self):
         """
         Test bad line in ics file
         """
         cal = get_test_file("badline.ics")
-        self.assertRaises(ParseError, base.read_one, cal)
+        self.assertRaises(ParseError, read_one, cal)
 
-        newcal = base.read_one(cal, ignore_unreadable=True)
+        newcal = read_one(cal, ignore_unreadable=True)
         self.assertEqual(str(newcal.vevent.x_bad_underscore), "<X-BAD-UNDERSCORE{}TRUE>")
 
     def test_parse_params(self):
         """
         Test parsing parameters
         """
-        self.assertEqual(base.parse_params(';ALTREP="http://www.wiz.org"'), [["ALTREP", "http://www.wiz.org"]])
+        self.assertEqual(parse_params(';ALTREP="http://www.wiz.org"'), [["ALTREP", "http://www.wiz.org"]])
         self.assertEqual(
-            base.parse_params(';ALTREP="http://www.wiz.org;;",Blah,Foo;NEXT=Nope;BAR'),
+            parse_params(';ALTREP="http://www.wiz.org;;",Blah,Foo;NEXT=Nope;BAR'),
             [["ALTREP", "http://www.wiz.org;;", "Blah", "Foo"], ["NEXT", "Nope"], ["BAR"]],
         )
 
@@ -418,7 +426,7 @@ class TestGeneralFileParsing(unittest.TestCase):
         The use of QUOTED-PRINTABLE encoding
         """
         ics_str = get_test_file("quoted-printable.ics")
-        vobjs = base.read_components(ics_str, allow_qp=True)
+        vobjs = read_components(ics_str, allow_qp=True)
         for vo in vobjs:
             self.assertIsNotNone(vo)
 
@@ -437,13 +445,13 @@ class TestVcards(unittest.TestCase):
         Fetches test file.
         """
         cls.test_file = get_test_file("vcard_with_groups.ics")
-        cls.card = base.read_one(cls.test_file)
+        cls.card = read_one(cls.test_file)
 
     def test_vcard_creation(self):
         """
         Test creating a vCard
         """
-        vcard = base.new_from_behavior("vcard", "3.0")
+        vcard = new_from_behavior("vcard", "3.0")
         self.assertEqual(str(vcard), "<VCARD| []>")
 
     def test_default_behavior(self):
@@ -451,7 +459,7 @@ class TestVcards(unittest.TestCase):
         Default behavior test.
         """
         card = self.card
-        self.assertEqual(base.get_behavior("note"), None)
+        self.assertEqual(get_behavior("note"), None)
         self.assertEqual(
             str(card.note.value), "The Mayor of the great city of Goerlitz in the great country of Germany.\nNext line."
         )
@@ -473,7 +481,7 @@ class TestVcards(unittest.TestCase):
         VCARD 3.0 parse test
         """
         test_file = get_test_file("simple_3_0_test.ics")
-        card = base.read_one(test_file)
+        card = read_one(test_file)
         # value not rendering correctly?
         # self.assertEqual(
         #    card.adr.value,
@@ -482,7 +490,7 @@ class TestVcards(unittest.TestCase):
         self.assertEqual(card.org.value, ["University of Novosibirsk", "Department of Octopus Parthenogenesis"])
 
         for _ in range(3):
-            new_card = base.read_one(card.serialize())
+            new_card = read_one(card.serialize())
             self.assertEqual(new_card.org.value, card.org.value)
             card = new_card
 

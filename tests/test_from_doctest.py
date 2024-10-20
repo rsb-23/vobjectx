@@ -5,8 +5,8 @@ from unittest import TestCase
 import dateutil.rrule as rrule
 
 import vobject as vo
-from tests.common import TEST_FILE_DIR
-from vobject.base import get_logical_lines
+
+from .common import TEST_FILE_DIR
 
 
 class Doctest(TestCase):
@@ -22,7 +22,7 @@ class Doctest(TestCase):
             "Line 1;encoding=quoted-printable:this is an evil=\n evil=\n format.",
             "Line 2 is a new line, it does not start with whitespace.",
         ]
-        result = [line for line, _ in get_logical_lines(StringIO(test_lines))]
+        result = [line for line, _ in vo.base.get_logical_lines(StringIO(test_lines))]
         self.assertEqual(result, expected)
 
     def test_vobject(self):
