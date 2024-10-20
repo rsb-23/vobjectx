@@ -4,9 +4,7 @@ Compares VTODOs and VEVENTs in two iCalendar sources.
 
 from argparse import ArgumentParser
 
-import vobject
-
-from .base import new_from_behavior, read_one
+import vobject as vo
 
 
 def get_sort_key(component):
@@ -105,7 +103,7 @@ def diff(left, right):
 
         for key in left_child_keys:
             right_list = right_comp.contents.get(key, [])
-            if isinstance(left_comp.contents[key][0], vobject.base.Component):
+            if isinstance(left_comp.contents[key][0], vo.base.Component):
                 comp_difference = process_component_lists(left_comp.contents[key], right_list)
                 if len(comp_difference) > 0:
                     different_components[key] = comp_difference
@@ -115,7 +113,7 @@ def diff(left, right):
 
         for key in right_child_keys:
             if key not in left_child_keys:
-                if isinstance(right_comp.contents[key][0], vobject.base.Component):
+                if isinstance(right_comp.contents[key][0], vo.base.Component):
                     different_components[key] = ([], right_comp.contents[key])
                 else:
                     different_content_lines.append(([], right_comp.contents[key]))
@@ -123,33 +121,32 @@ def diff(left, right):
         if not different_content_lines and not different_components:
             return None
 
-        left = new_from_behavior(left_comp.name)
-        right = new_from_behavior(left_comp.name)
-        # add a UID, if one existed, despite the fact that they'll always be
-        # the same
+        _left = vo.new_from_behavior(left_comp.name)
+        _right = vo.new_from_behavior(left_comp.name)
+        # add a UID, if one existed, despite the fact that they'll always be the same
         uid = left_comp.get_child_value("uid")
         if uid is not None:
-            left.add("uid").value = uid
-            right.add("uid").value = uid
+            _left.add("uid").value = uid
+            _right.add("uid").value = uid
 
         for name, child_pair_list in different_components.items():
             left_components, right_components = zip(*child_pair_list)
             if len(left_components) > 0:
                 # filter out None
-                left.contents[name] = filter(None, left_components)
+                _left.contents[name] = filter(None, left_components)
             if len(right_components) > 0:
                 # filter out None
-                right.contents[name] = filter(None, right_components)
+                _right.contents[name] = filter(None, right_components)
 
         for left_child_line, right_child_line in different_content_lines:
             non_empty = left_child_line or right_child_line
             name = non_empty[0].name
             if left_child_line is not None:
-                left.contents[name] = left_child_line
+                _left.contents[name] = left_child_line
             if right_child_line is not None:
-                right.contents[name] = right_child_line
+                _right.contents[name] = right_child_line
 
-        return left, right
+        return _left, _right
 
     vevents = process_component_lists(
         sort_by_uid(getattr(left, "vevent_list", [])), sort_by_uid(getattr(right, "vevent_list", []))
@@ -177,7 +174,7 @@ def get_options():
     # Configuration options #
     usage = "usage: %prog [options] ics_file1 ics_file2"
     parser = ArgumentParser(usage=usage, description="ics_diff will print a comparison of two iCalendar files ")
-    parser.add_argument("--version", action="version", version=vobject.VERSION)
+    parser.add_argument("--version", action="version", version=vo.VERSION)
     parser.add_argument(
         "-i",
         "--ignore-dtstamp",
@@ -202,8 +199,8 @@ def main():
         ignore_dtstamp = options.ignore
         ics_file1, ics_file2 = args
         with open(ics_file1) as f, open(ics_file2) as g:
-            cal1 = read_one(f)
-            cal2 = read_one(g)
+            cal1 = vo.read_one(f)
+            cal2 = vo.read_one(g)
         delete_extraneous(cal1, ignore_dtstamp=ignore_dtstamp)
         delete_extraneous(cal2, ignore_dtstamp=ignore_dtstamp)
         pretty_diff(cal1, cal2)

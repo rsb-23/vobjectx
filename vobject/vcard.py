@@ -1,11 +1,8 @@
 """Definitions and behavior for vCard 3.0"""
 
-import codecs
-
-from . import behavior
 from .base import ContentLine, register_behavior
-from .exceptions import AllException
-from .helper import backslash_escape
+from .behavior import Behavior
+from .helper import backslash_escape, byte_decoder, byte_encoder
 from .icalendar import string_to_text_values
 
 # ------------------------ vCard structs ---------------------------------------
@@ -45,7 +42,7 @@ class Name:
                 and self.prefix == other.prefix
                 and self.suffix == other.suffix
             )
-        except AllException:
+        except AttributeError:
             return False
 
 
@@ -94,14 +91,14 @@ class Address:
                 and self.code == other.code
                 and self.country == other.country
             )
-        except AllException:
+        except AttributeError:
             return False
 
 
 # ------------------------ Registered Behavior subclasses ----------------------
 
 
-class VCardTextBehavior(behavior.Behavior):
+class VCardTextBehavior(Behavior):
     """
     Provide backslash escape encoding/decoding for single valued properties.
 
@@ -128,10 +125,7 @@ class VCardTextBehavior(behavior.Behavior):
                 line.encoding_param = cls.base64string
             encoding = getattr(line, "encoding_param", None)
             if encoding:
-                if isinstance(line.value, bytes):
-                    line.value = codecs.decode(line.value, "base64")
-                else:
-                    line.value = codecs.decode(line.value.encode("utf-8"), "base64")
+                line.value = byte_decoder(line.value, "base64")
             else:
                 line.value = string_to_text_values(line.value)[0]
             line.encoded = False
@@ -145,15 +139,15 @@ class VCardTextBehavior(behavior.Behavior):
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
                 if isinstance(line.value, bytes):
-                    line.value = codecs.encode(line.value, "base64").decode("utf-8").replace("\n", "")
+                    line.value = byte_encoder(line.value).decode("utf-8").replace("\n", "")
                 else:
-                    line.value = codecs.encode(line.value.encode(encoding), "base64").decode("utf-8")
+                    line.value = byte_encoder(line.value.encode(encoding)).decode("utf-8")
             else:
                 line.value = backslash_escape(line.value)
             line.encoded = True
 
 
-class VCardBehavior(behavior.Behavior):
+class VCardBehavior(Behavior):
     allow_group = True
     default_behavior = VCardTextBehavior
 
@@ -220,7 +214,6 @@ class GEO(VCardBehavior):
 
 register_behavior(GEO)
 
-
 WACKY_APPLE_PHOTO_SERIALIZE = True
 REALLY_LARGE = 1e50
 
@@ -234,7 +227,7 @@ class Photo(VCardTextBehavior):
         return f" (BINARY PHOTO DATA at 0x{id(line.value)!s}) "
 
     @classmethod
-    def serialize(cls, obj, buf, line_length, validate, *args, **kwargs):
+    def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):
         """
         Apple's Address Book is *really* weird with images, it expects
         base64 data to have very specific whitespace.  It seems Address Book

@@ -1,5 +1,7 @@
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
+from __future__ import annotations
+
 import datetime as dt
 import logging
 import socket
@@ -65,6 +67,7 @@ register_tzid("UTC", utc)
 
 
 # -------------------- Helper subclasses ---------------------------------------
+# noinspection PyProtectedMember
 class TimezoneComponent(Component):
     """
     A VTIMEZONE object.
@@ -106,7 +109,8 @@ class TimezoneComponent(Component):
             register_tzid(tzid, tzinfo)
         return tzid
 
-    def gettzinfo(self):
+    @property
+    def tzinfo(self):
         # workaround for dateutil failing to parse some experimental properties
         good_lines = ("rdate", "rrule", "dtstart", "tzname", "tzoffsetfrom", "tzoffsetto", "tzid")
         # serialize encodes as utf-8, cStringIO will leave utf-8 alone
@@ -129,7 +133,8 @@ class TimezoneComponent(Component):
         buffer.seek(0)  # tzical wants to read a stream
         return tz.tzical(buffer).get()
 
-    def settzinfo(self, tzinfo, start=2000, end=2030):
+    @tzinfo.setter
+    def tzinfo(self, tzinfo, start=2000, end=2030):
         """
         Create appropriate objects in self to represent tzinfo.
 
@@ -300,8 +305,6 @@ class TimezoneComponent(Component):
 
                 comp.add("rrule").value = new_rule
 
-    tzinfo = property(gettzinfo, settzinfo)
-
     @staticmethod
     def pick_tzid(tzinfo, allow_utc=False):
         """
@@ -331,11 +334,8 @@ class TimezoneComponent(Component):
         # there was no standard time in 2000!
         raise VObjectError(f"Unable to guess TZID for tzinfo {tzinfo!s}")
 
-    def __str__(self):
-        return f'<VTIMEZONE | {getattr(self, "tzid", "No TZID")}>'
-
     def __repr__(self):
-        return self.__str__()
+        return f'<VTIMEZONE | {getattr(self, "tzid", "No TZID")}>'
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -344,6 +344,7 @@ class TimezoneComponent(Component):
         print("")
 
 
+# noinspection PyProtectedMember
 class RecurringComponent(Component):
     """
     A vCalendar component like VEVENT or VTODO which may recur.
@@ -360,13 +361,17 @@ class RecurringComponent(Component):
     result set, but by default, the rruleset property doesn't do this work
     around, to access it getrruleset must be called with addRDate set True.
 
-    @ivar rruleset:
+    @property rruleset:
         A U{rruleset<https://moin.conectiva.com.br/DateUtil>}.
     """
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
         self.is_native = True
+
+    @property
+    def rruleset(self):
+        return self.getrruleset()
 
     def getrruleset(self, add_rdate=False):
         """
@@ -407,26 +412,21 @@ class RecurringComponent(Component):
                         return None
 
                 if name in DATENAMES:
+                    # ignoring RDATEs with PERIOD values for now
                     if type(line.value[0]) is dt.datetime:
                         list(map(addfunc, line.value))
                     elif type(line.value[0]) is dt.date:
                         for _dt in line.value:
                             addfunc(dt.datetime(_dt.year, _dt.month, _dt.day))
-                    else:
-                        # ignore RDATEs with PERIOD values for now
-                        pass  # sourcery skip
                 elif name in RULENAMES:
-                    # a Ruby iCalendar library escapes semi-colons in rrules,
-                    # so also remove any backslashes
+                    # a Ruby iCalendar library escapes semi-colons in rrules, so also remove any backslashes
                     value = line.value.replace("\\", "")
-                    # If dtstart has no time zone, `until`
-                    # shouldn't get one, either:
+                    # If dtstart has no time zone, `until` shouldn't get one, either:
                     ignoretz = not isinstance(dtstart, dt.datetime) or dtstart.tzinfo is None
                     try:
                         until = rrule.rrulestr(value, ignoretz=ignoretz)._until
                     except ValueError:
-                        # WORKAROUND: dateutil<=2.7.2 doesn't set the time zone
-                        # of dtstart
+                        # WORKAROUND: dateutil<=2.7.2 doesn't set the time zone of dtstart
                         if ignoretz:
                             raise
                         utc_now = dt.datetime.now(dt.timezone.utc)
@@ -475,11 +475,9 @@ class RecurringComponent(Component):
 
                 if name in ["rrule", "rdate"] and add_rdate:
                     # rlist = rruleset._rrule if name == 'rrule' else rruleset._rdate
-                    try:
-                        # dateutils does not work with all-day
-                        # (dt.date) items so we need to convert to a
-                        # dt.datetime (which is what dateutils
-                        # does internally)
+                    try:  # sourcery skip
+                        # dateutils does not work with all-day (dt.date) items so we need to convert to a
+                        # dt.datetime (which is what dateutils does internally)
                         if not isinstance(dtstart, dt.datetime):
                             adddtstart = dt.datetime.fromordinal(dtstart.toordinal())
                         else:
@@ -501,7 +499,8 @@ class RecurringComponent(Component):
 
         return rruleset
 
-    def setrruleset(self, rruleset):
+    @rruleset.setter
+    def rruleset(self, rruleset):
         # Get DTSTART from component (or DUE if no DTSTART in a VTODO)
         try:
             dtstart = self.dtstart.value
@@ -612,17 +611,6 @@ class RecurringComponent(Component):
                         buf.write(",".join(paramvals))
 
                     self.add(name).value = buf.getvalue()
-
-    rruleset = property(getrruleset, setrruleset)
-
-    def __setattr__(self, name, value):
-        """
-        For convenience, make self.contents directly accessible.
-        """
-        if name == "rruleset":
-            self.setrruleset(value)
-        else:
-            super().__setattr__(name, value)
 
 
 class TextBehavior(Behavior):
@@ -936,24 +924,24 @@ class VCalendar2(VCalendarComponentBehavior):
             obj.add(ContentLine("VERSION", [], cls.version_string))
         tzids_used = {}
 
-        def find_tzids(obj, table):
-            if isinstance(obj, ContentLine) and (obj.behavior is None or not obj.behavior.force_utc):
-                if getattr(obj, "tzid_param", None):
-                    table[obj.tzid_param] = 1
+        def find_tzids(obj_, table):
+            if isinstance(obj_, ContentLine) and (obj_.behavior is None or not obj_.behavior.force_utc):
+                if getattr(obj_, "tzid_param", None):
+                    table[obj_.tzid_param] = 1
                 else:
-                    if type(obj.value) is list:
-                        for _ in obj.value:
-                            tzinfo = getattr(obj.value, "tzinfo", None)
-                            tzid = TimezoneComponent.register_tzinfo(tzinfo)
-                            if tzid:
-                                table[tzid] = 1
+                    if type(obj_.value) is list:
+                        for _ in obj_.value:
+                            tzinfo = getattr(obj_.value, "tzinfo", None)
+                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                            if tzid_:
+                                table[tzid_] = 1
                     else:
-                        tzinfo = getattr(obj.value, "tzinfo", None)
-                        tzid = TimezoneComponent.register_tzinfo(tzinfo)
-                        if tzid:
-                            table[tzid] = 1
-            for child in obj.get_children():
-                if obj.name != "VTIMEZONE":
+                        tzinfo = getattr(obj_.value, "tzinfo", None)
+                        tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                        if tzid_:
+                            table[tzid_] = 1
+            for child in obj_.get_children():
+                if obj_.name != "VTIMEZONE":
                     find_tzids(child, table)
 
         find_tzids(obj, tzids_used)
@@ -964,7 +952,7 @@ class VCalendar2(VCalendarComponentBehavior):
                 obj.add(TimezoneComponent(tzinfo=get_tzid(tzid)))
 
     @classmethod
-    def serialize(cls, obj, buf, line_length, validate=True):
+    def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):
         """
         Set implicit parameters, do encoding, return unicode string.
 
@@ -1041,14 +1029,14 @@ class VTimezone(VCalendarComponentBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         if not hasattr(obj, "tzid") or obj.tzid.value is None:
             if raise_exception:
                 m = "VTIMEZONE components must contain a valid TZID"
                 raise ValidateError(m)
             return False
         if "standard" in obj.contents or "daylight" in obj.contents:
-            return super().validate(obj, raise_exception, *args)
+            return super().validate(obj, raise_exception, complain_unrecognized)
 
         if raise_exception:
             m = "VTIMEZONE components must contain a STANDARD or a DAYLIGHT component"
@@ -1142,9 +1130,9 @@ class VEvent(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         if "dtend" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, *args)
+            return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
             m = "VEVENT components cannot contain both DTEND and DURATION\
                  components"
@@ -1201,9 +1189,9 @@ class VTodo(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         if "due" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, *args)
+            return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
             m = "VTODO components cannot contain both DUE and DURATION\
                  components"
@@ -1311,7 +1299,7 @@ class VAlarm(VCalendarComponentBehavior):
             obj.add("trigger").value = dt.timedelta(0)
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         """
         # TODO
         if obj.contents.has_key('dtend') and obj.contents.has_key('duration'):
@@ -1359,9 +1347,9 @@ class VAvailability(VCalendarComponentBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         if "dtend" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, *args)
+            return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
             m = "VAVAILABILITY components cannot contain both DTEND and DURATION components"
             raise ValidateError(m)
@@ -1398,7 +1386,7 @@ class Available(RecurringBehavior):
     }
 
     @classmethod
-    def validate(cls, obj, raise_exception, *args):
+    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         has_dtend = "dtend" in obj.contents
         has_duration = "duration" in obj.contents
         if has_dtend and has_duration:
@@ -1414,7 +1402,7 @@ class Available(RecurringBehavior):
                 raise ValidateError(m)
             return False
         else:
-            return super().validate(obj, raise_exception, *args)
+            return super().validate(obj, raise_exception, complain_unrecognized)
 
 
 register_behavior(Available)
@@ -1835,14 +1823,14 @@ def string_to_durations(s, strict=False):
     Returns list of timedelta objects.
     """
 
-    def make_timedelta(sign, week, day, hour, minute, sec):
-        sign = -1 if sign == "-" else 1
-        week = int(week)
-        day = int(day)
-        hour = int(hour)
-        minute = int(minute)
-        sec = int(sec)
-        return sign * dt.timedelta(weeks=week, days=day, hours=hour, minutes=minute, seconds=sec)
+    def make_timedelta(sign_, week_, day_, hour_, minute_, sec_):
+        sign_ = -1 if sign_ == "-" else 1
+        week_ = int(week_)
+        day_ = int(day_)
+        hour_ = int(hour_)
+        minute_ = int(minute_)
+        sec_ = int(sec_)
+        return sign_ * dt.timedelta(weeks=week_, days=day_, hours=hour_, minutes=minute_, seconds=sec_)
 
     def error(msg):
         if strict:

@@ -6,12 +6,10 @@ from datetime import datetime
 import pytz
 from dateutil import tz
 
-import vobject
-
-VERSION = "0.1"
+import vobject as vo
 
 
-def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vobject.icalendar.utc):
+def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vo.icalendar.utc):
     """
     Change the timezone of the specified component.
 
@@ -46,7 +44,7 @@ def convert_events(utc_only, args):
     _tzone = args[1] if len(args) > 1 else "UTC"
 
     print(f"... Reading {ics_file}")
-    cal = vobject.read_one(open(ics_file))
+    cal = vo.read_one(open(ics_file))
     change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz("UTC"), utc_only=utc_only)
 
     out_name = f"{ics_file}.converted"
@@ -70,7 +68,7 @@ def get_options():
     # Configuration options
     usage = """usage: %prog [options] ics_file [timezone]"""
     parser = ArgumentParser(usage=usage, description="change_tz will convert the timezones in an ics file. ")
-    parser.add_argument("--version", action="version", version=vobject.VERSION)
+    parser.add_argument("--version", action="version", version=vo.VERSION)
 
     parser.add_argument(
         "-u", "--only-utc", dest="utc", action="store_true", default=False, help="Only change UTC events."

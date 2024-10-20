@@ -1,10 +1,8 @@
 """vobject module for reading vCard and vCalendar files."""
 
-import codecs
-
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
-from .helper import get_buffer, logger, split_by_size
+from .helper import byte_decoder, get_buffer, logger, split_by_size
 from .helper.imports_ import TextIO, contextlib, copy, lru_cache, re, sys
 
 
@@ -290,16 +288,12 @@ class ContentLine(VBase):
             self.singletonparams.remove("QUOTED-PRINTABLE")
         if qp:
             if "ENCODING" in self.params:
-                self.value = codecs.decode(self.value.encode("utf-8"), "quoted-printable").decode(
-                    self.params["ENCODING"]
-                )
+                _encoding = self.params["ENCODING"]
+            elif "CHARSET" in self.params:
+                _encoding = self.params["CHARSET"][0]
             else:
-                if "CHARSET" in self.params:
-                    self.value = codecs.decode(self.value.encode("utf-8"), "quoted-printable").decode(
-                        self.params["CHARSET"][0]
-                    )
-                else:
-                    self.value = codecs.decode(self.value.encode("utf-8"), "quoted-printable").decode("utf-8")
+                _encoding = "utf-8"
+            self.value = byte_decoder(self.value, "quoted-printable").decode(_encoding)
 
     @classmethod
     def duplicate(cls, copyit):
@@ -380,16 +374,13 @@ class ContentLine(VBase):
         """
         return self.behavior.value_repr(self) if self.behavior else self.value
 
-    def __str__(self):
+    def __repr__(self):
         try:
             value_repr = self.value_repr()
         except UnicodeEncodeError:
             value_repr = self.value_repr().encode("utf-8")
 
         return f"<{self.name}{self.params}{value_repr}>"
-
-    def __repr__(self):
-        return self.__str__()
 
     def __unicode__(self):
         return f"<{self.name}{self.params}{self.value_repr()}>"
@@ -610,14 +601,8 @@ class Component(VBase):
                     child.behavior = None
                     child.parent_behavior = None
 
-    def __str__(self):
-        if self.name:
-            return f"<{self.name}| {self.get_sorted_children()}>"
-        else:
-            return f"<*unnamed*| {self.get_sorted_children()}>"
-
     def __repr__(self):
-        return self.__str__()
+        return f"<{self.name or '*unnamed*'}| {self.get_sorted_children()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -856,13 +841,12 @@ def dquote_escape(param):
 
 def fold_one_line(outbuf: TextIO, input_: str, line_length=75):
     """
-    Folding line procedure that ensures multi-byte utf-8 sequences are not
-    broken across lines
+    Folding line procedure that ensures multi-byte utf-8 sequences are not broken across lines
     """
     chunks = split_by_size(input_, byte_size=line_length)
     for chunk in chunks:
         outbuf.write(chunk)
-    outbuf.write("\r\n")
+    outbuf.write(Char.CRLF)
 
 
 def default_serialize(obj, buf, line_length):

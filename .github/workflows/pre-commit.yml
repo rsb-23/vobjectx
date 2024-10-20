@@ -21,5 +21,5 @@ jobs:
 
     - name: Run pre-commit
       env:
-        SKIP: pylint,mypy
+        SKIP: pylint,mypy,no-commit-to-branch
       run: pre-commit run --all-files
