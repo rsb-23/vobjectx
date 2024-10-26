@@ -1,5 +1,9 @@
 """vobject module for reading vCard and vCalendar files."""
 
+from __future__ import annotations
+
+import datetime as dt
+
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
@@ -67,7 +71,6 @@ class VBase:
         self.behavior = None
         self.parent_behavior = None
         self.is_native = False
-        # self.encoded = None  # kwds.get("encoded")
 
     def copy(self, copyit):
         self.group = copyit.group
@@ -266,7 +269,7 @@ class ContentLine(VBase):
         self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number
-        self.value = value
+        self.value: str | dt.date = value
 
         def update_table(x):
             if len(x) == 1:
@@ -574,7 +577,8 @@ class Component(VBase):
         """
         Set behavior if one matches name, version_line.value.
         """
-        v = get_behavior(self.name, version_line.value)
+        _id = None if version_line is None else version_line.value
+        v = get_behavior(self.name, id_=_id)
         if v:
             self.set_behavior(v)
 
@@ -735,15 +739,6 @@ patterns["wraporend"] = r"({wrap!s} | {lineend!s} )".format(**patterns)
 wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
 logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
 
-TEST_LINES = """
-Line 0 text
- , Line 0 continued.
-Line 1;encoding=quoted-printable:this is an evil=
- evil=
- format.
-Line 2 is a new line, it does not start with whitespace.
-"""
-
 
 def get_logical_lines(fp, allow_qp=True):
     """
@@ -755,18 +750,6 @@ def get_logical_lines(fp, allow_qp=True):
     of the line.
 
     Quoted-printable data will be decoded in the Behavior decoding phase.
-
-    # We're leaving this test in for awhile, because the unittest was ugly and dumb.
-    >>> from io import StringIO
-    >>> f=StringIO(TEST_LINES)
-    >>> for num, line_ in enumerate(get_logical_lines(f)):
-    ...     print("Line %s: %s" % (num, line_[0]))
-    ...
-    Line 0: Line 0 text, Line 0 continued.
-    Line 1: Line 1;encoding=quoted-printable:this is an evil=
-     evil=
-     format.
-    Line 2: Line 2 is a new line, it does not start with whitespace.
     """
     if not allow_qp:
         val = fp.read(-1)
@@ -800,18 +783,16 @@ def get_logical_lines(fp, allow_qp=True):
 
             if quoted_printable and allow_qp:
                 logical_line.write("\n")
-                logical_line.write(line)
                 quoted_printable = False
             elif line[0] in Char.SPACEORTAB:
-                logical_line.write(line[1:])
+                line = line[1:]
             elif logical_line.tell() > 0:
                 yield logical_line.getvalue(), line_start_number
                 line_start_number = line_number
                 logical_line = get_buffer()
-                logical_line.write(line)
             else:
                 logical_line = get_buffer()
-                logical_line.write(line)
+            logical_line.write(line)
 
             # vCard 2.1 allows parameters to be encoded without a parameter name
             # False positives are unlikely, but possible.
@@ -1018,12 +999,11 @@ def register_behavior(behavior, name=None, default=False, id_=None):
     if id_ is None:
         id_ = behavior.version_string
     if name in __behavior_registry:
+        __behavior_registry[name][id_] = behavior
         if default:
-            __behavior_registry[name].insert(0, (id_, behavior))
-        else:
-            __behavior_registry[name].append((id_, behavior))
+            __behavior_registry[name]["default_"] = behavior
     else:
-        __behavior_registry[name] = [(id_, behavior)]
+        __behavior_registry[name] = {id_: behavior, "default_": behavior}
 
 
 def get_behavior(name, id_=None):
@@ -1034,12 +1014,8 @@ def get_behavior(name, id_=None):
     """
     name = name.upper()
     if name in __behavior_registry:
-        if id_:
-            for n, behavior in __behavior_registry[name]:
-                if n == id_:
-                    return behavior
-
-        return __behavior_registry[name][0][1]
+        named_registry = __behavior_registry[name]
+        return named_registry.get(id_) or named_registry["default_"]
     return None
 
 

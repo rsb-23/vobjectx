@@ -298,7 +298,7 @@ class TimezoneComponent(Component):
                         )
                         end_date = du_rule[0]
                     end_date = end_date.replace(tzinfo=utc) - rule["offsetfrom"]
-                    end_string = f";UNTIL={date_time_to_string(end_date)}"
+                    end_string = f";UNTIL={datetime_to_string(end_date)}"
                 else:
                     end_string = ""
                 new_rule = f"FREQ=YEARLY{day_string!s};BYMONTH={rule['month']!s}{end_string!s}"
@@ -510,7 +510,7 @@ class RecurringComponent(Component):
             else:
                 raise
 
-        is_date = dt.date == type(dtstart)
+        is_date = type(dtstart) is dt.date
         if is_date:
             dtstart = dt.datetime(dtstart.year, dtstart.month, dtstart.day)
             until_serialize = date_to_string
@@ -688,7 +688,7 @@ class RecurringBehavior(VCalendarComponentBehavior):
         """
         if not hasattr(obj, "uid"):
             now = dt.datetime.now(utc)
-            now = date_time_to_string(now)
+            now = datetime_to_string(now)
             host = socket.gethostname()
             obj.add(ContentLine("UID", [], f"{now} - {get_random_int()}@{host}"))
 
@@ -726,8 +726,7 @@ class DateTimeBehavior(Behavior):
             obj.params["X-VOBJ-FLOATINGTIME-ALLOWED"] = ["TRUE"]
         if obj.params.get("TZID"):
             # Keep a copy of the original TZID around
-            obj.params["X-VOBJ-ORIGINAL-TZID"] = [obj.params["TZID"]]
-            del obj.params["TZID"]
+            obj.params["X-VOBJ-ORIGINAL-TZID"] = [obj.params.pop("TZID")]
         return obj
 
     @classmethod
@@ -738,14 +737,14 @@ class DateTimeBehavior(Behavior):
         if obj.is_native:
             obj.is_native = False
             tzid = TimezoneComponent.register_tzinfo(obj.value.tzinfo)
-            obj.value = date_time_to_string(obj.value, cls.force_utc)
+            obj_value: str | dt.datetime = datetime_to_string(obj.value, cls.force_utc)
             if not cls.force_utc and tzid is not None:
                 obj.tzid_param = tzid
             if obj.params.get("X-VOBJ-ORIGINAL-TZID"):
                 if not hasattr(obj, "tzid_param"):
                     obj.tzid_param = obj.x_vobj_original_tzid_param
                 del obj.params["X-VOBJ-ORIGINAL-TZID"]
-
+            obj.value = obj_value
         return obj
 
 
@@ -847,7 +846,7 @@ class MultiDateBehavior(Behavior):
                     tzid = TimezoneComponent.register_tzinfo(val.tzinfo)
                     if tzid is not None:
                         obj.tzid_param = tzid
-                transformed.append(date_time_to_string(val))
+                transformed.append(datetime_to_string(val))
             obj.value = ",".join(transformed)
         return obj
 
@@ -1032,15 +1031,13 @@ class VTimezone(VCalendarComponentBehavior):
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
         if not hasattr(obj, "tzid") or obj.tzid.value is None:
             if raise_exception:
-                m = "VTIMEZONE components must contain a valid TZID"
-                raise ValidateError(m)
+                raise ValidateError("VTIMEZONE components must contain a valid TZID")
             return False
         if "standard" in obj.contents or "daylight" in obj.contents:
             return super().validate(obj, raise_exception, complain_unrecognized)
 
         if raise_exception:
-            m = "VTIMEZONE components must contain a STANDARD or a DAYLIGHT component"
-            raise ValidateError(m)
+            raise ValidateError("VTIMEZONE components must contain a STANDARD or a DAYLIGHT component")
         return False
 
     @staticmethod
@@ -1134,9 +1131,7 @@ class VEvent(RecurringBehavior):
         if "dtend" not in obj.contents or "duration" not in obj.contents:
             return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
-            m = "VEVENT components cannot contain both DTEND and DURATION\
-                 components"
-            raise ValidateError(m)
+            raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
         return False
 
 
@@ -1193,9 +1188,7 @@ class VTodo(RecurringBehavior):
         if "due" not in obj.contents or "duration" not in obj.contents:
             return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
-            m = "VTODO components cannot contain both DUE and DURATION\
-                 components"
-            raise ValidateError(m)
+            raise ValidateError("VTODO components cannot contain both DUE and DURATION components")
         return False
 
 
@@ -1304,9 +1297,7 @@ class VAlarm(VCalendarComponentBehavior):
         # TODO
         if obj.contents.has_key('dtend') and obj.contents.has_key('duration'):
             if raise_exception:
-                m = "VEVENT components cannot contain both DTEND and DURATION\
-                     components"
-                raise ValidateError(m)
+                raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
             return False
         else:
             return super().validate(obj, raise_exception, *args)
@@ -1351,8 +1342,7 @@ class VAvailability(VCalendarComponentBehavior):
         if "dtend" not in obj.contents or "duration" not in obj.contents:
             return super().validate(obj, raise_exception, complain_unrecognized)
         if raise_exception:
-            m = "VAVAILABILITY components cannot contain both DTEND and DURATION components"
-            raise ValidateError(m)
+            raise ValidateError("VAVAILABILITY components cannot contain both DTEND and DURATION components")
         return False
 
 
@@ -1391,15 +1381,11 @@ class Available(RecurringBehavior):
         has_duration = "duration" in obj.contents
         if has_dtend and has_duration:
             if raise_exception:
-                m = "AVAILABLE components cannot contain both DTEND and DURATION\
-                     properties"
-                raise ValidateError(m)
+                raise ValidateError("AVAILABLE components cannot contain both DTEND and DURATION properties")
             return False
         elif not (has_dtend or has_duration):
             if raise_exception:
-                m = "AVAILABLE components must contain one of DTEND or DURATION\
-                     properties"
-                raise ValidateError(m)
+                raise ValidateError("AVAILABLE components must contain one of DTEND or DURATION properties")
             return False
         else:
             return super().validate(obj, raise_exception, complain_unrecognized)
@@ -1487,8 +1473,7 @@ class Trigger(Behavior):
                     obj.is_native = False
                     return DateTimeBehavior.transform_to_native(obj)
                 except AllException as e:
-                    msg = "TRIGGER with no VALUE not recognized as DURATION or as DATE-TIME"
-                    raise ParseError(msg) from e
+                    raise ParseError("TRIGGER with no VALUE not recognized as DURATION or as DATE-TIME") from e
         elif value == "DATE-TIME":
             # TRIGGERs with DATE-TIME values must be in UTC, we could validate
             # that fact, for now we take it on faith.
@@ -1606,7 +1591,7 @@ register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
 
 
 # ------------------------ Serializing helper functions ------------------------
-def num_to_digits(num, places):
+def num_to_digits(num, places) -> str:
     """
     Helper, for converting numbers to textual digits.
     """
@@ -1655,7 +1640,7 @@ def time_to_string(date_or_date_time):
     of either based on the type of the argument
     """
     if hasattr(date_or_date_time, "hour"):
-        return date_time_to_string(date_or_date_time)
+        return datetime_to_string(date_or_date_time)
     return date_to_string(date_or_date_time)
 
 
@@ -1666,22 +1651,9 @@ def date_to_string(date):
     return year + month + day
 
 
-def date_time_to_string(date_time, convert_to_utc=False):
-    """
-    Ignore tzinfo unless convert_toUTC.  Output string.
-    """
-    if date_time.tzinfo and convert_to_utc:
-        date_time = date_time.astimezone(utc)
-
-    datestr = date_time.strftime("%Y%m%dT%H%M%S")
-    if tzinfo_eq(date_time.tzinfo, utc):
-        datestr += "Z"
-    return datestr
-
-
 def datetime_to_string(date_time, convert_to_utc=False) -> str:
     """
-    Ignore tzinfo unless convert_to_utc.  Output string.
+    Ignore tzinfo unless convert_to_utc. Output string.
     """
     if date_time.tzinfo and convert_to_utc:
         date_time = date_time.astimezone(utc)
@@ -1692,7 +1664,8 @@ def datetime_to_string(date_time, convert_to_utc=False) -> str:
     return datestr
 
 
-def delta_to_offset(delta):
+def delta_to_offset(delta: dt.timedelta) -> str:
+    """Returns offset in format : nHnM"""
     abs_delta = abs(delta)
     hours = int(abs_delta.seconds / 3600)
     hours_string = num_to_digits(hours, 2)
@@ -1703,11 +1676,11 @@ def delta_to_offset(delta):
 
 
 def period_to_string(period, convert_to_utc=False):
-    txtstart = date_time_to_string(period[0], convert_to_utc)
+    txtstart = datetime_to_string(period[0], convert_to_utc)
     if isinstance(period[1], dt.timedelta):
         txtend = timedelta_to_string(period[1])
     else:
-        txtend = date_time_to_string(period[1], convert_to_utc)
+        txtend = datetime_to_string(period[1], convert_to_utc)
     return f"{txtstart}/{txtend}"
 
 
@@ -1993,7 +1966,6 @@ def get_transition(transition_to, year, tzinfo):
             for day_ in days:
                 with contextlib.suppress(ValueError):
                     yield dt.datetime(year_, month_, day_)
-
         else:
             for hour in hours:
                 yield dt.datetime(year_, month_, day_, hour)

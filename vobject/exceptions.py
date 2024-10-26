@@ -10,7 +10,9 @@ class VObjectError(Exception):
 
 
 class ParseError(VObjectError):
-    pass
+    def __init__(self, msg, line_number=None, *, inputs=None):
+        super().__init__(msg, line_number)
+        self.inputs = inputs
 
 
 class ValidateError(VObjectError):

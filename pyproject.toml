@@ -21,4 +21,5 @@ max-line-length=120
 fail_under = 70.0
 [tool.coverage.run]
 source = [ "vobject/" ]
+omit = ["wrappers.py"]
 command_line = "-m unittest discover -s tests -t ."

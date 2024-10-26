@@ -160,14 +160,15 @@ def diff(left, right):
 
 
 def pretty_diff(left_obj, right_obj):
+    seperator_size = 15
     for left, right in diff(left_obj, right_obj):
-        print("<<<<<<<<<<<<<<<")
+        print("<" * seperator_size)
         if left is not None:
             left.pretty_print()
-        print("===============")
+        print("=" * seperator_size)
         if right is not None:
             right.pretty_print()
-        print(">>>>>>>>>>>>>>>\n")
+        print(">" * seperator_size)
 
 
 def get_options():

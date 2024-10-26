@@ -63,7 +63,7 @@ VObject Overview
     >>> list(v.rruleset)
     [datetime.datetime(2004, 12, 15, 14, 0, tzinfo=tzutc()), datetime.datetime(2004, 12, 22, 14, 0, tzinfo=tzutc())]
     >>> v.add('uid').value = "randomuid@MYHOSTNAME"
-    >>> print x.serialize()
+    >>> print(x.serialize())
     BEGIN:VCALENDAR
     VERSION:2.0
     PRODID:-//PYVOBJECT//NONSGML Version 1//EN
