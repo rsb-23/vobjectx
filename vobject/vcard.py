@@ -5,6 +5,7 @@ from __future__ import annotations
 from .base import ContentLine, register_behavior
 from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder
+from .helper.converter import to_list, to_string
 from .icalendar import string_to_text_values
 
 # ------------------------ vCard structs ---------------------------------------
@@ -21,16 +22,9 @@ class Name:
         self.prefix = prefix
         self.suffix = suffix
 
-    @staticmethod
-    def to_string(val):
-        """
-        Turn a string or array value into a string.
-        """
-        return " ".join(val) if type(val) in (list, tuple) else val
-
     def __str__(self):
         eng_order = ("prefix", "given", "additional", "family", "suffix")
-        return " ".join(self.to_string(getattr(self, val)) for val in eng_order)
+        return " ".join(to_string(getattr(self, val)) for val in eng_order)
 
     def __repr__(self):
         return f"<Name: {self!s}>"
@@ -61,22 +55,15 @@ class Address:
         self.code = code
         self.country = country
 
-    @staticmethod
-    def to_string(val, join_char="\n"):
-        """
-        Turn a string or array value into a string.
-        """
-        return join_char.join(val) if type(val) in (list, tuple) else val
-
     lines = ("box", "extended", "street")
     one_line = ("city", "region", "code")
 
     def __str__(self):
-        lines = "\n".join(self.to_string(getattr(self, val)) for val in self.lines if getattr(self, val))
-        one_line = tuple(self.to_string(getattr(self, val), " ") for val in self.one_line)
+        lines = "\n".join(to_string(getattr(self, val), "\n") for val in self.lines if getattr(self, val))
+        one_line = tuple(to_string(getattr(self, val)) for val in self.one_line)
         lines += "\n{0!s}, {1!s} {2!s}".format(*one_line)
         if self.country:
-            lines += "\n" + self.to_string(self.country)
+            lines += "\n" + to_string(self.country, "\n")
         return lines
 
     def __repr__(self):
@@ -252,10 +239,6 @@ def split_fields(string):
     Return a list of strings or lists from a Name or Address.
     """
     return [to_list_or_string(i) for i in string_to_text_values(string, list_separator=";", char_list=";")]
-
-
-def to_list(string_or_list):
-    return [string_or_list] if isinstance(string_or_list, str) else string_or_list
 
 
 def serialize_fields(obj, order=None):

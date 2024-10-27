@@ -4,48 +4,16 @@ from __future__ import annotations
 
 import datetime as dt
 
+from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import TextIO, contextlib, copy, lru_cache, re, sys
-
-
-def to_unicode(value):
-    """Converts a string argument to a unicode string.
-
-    If the argument is already a unicode string, it is returned
-    unchanged.  Otherwise it must be a byte string and is decoded as utf8.
-    """
-    return value if isinstance(value, str) else value.decode("utf-8")
-
-
-def to_basestring(s):
-    """Converts a string argument to a byte string.
-
-    If the argument is already a byte string, it is returned unchanged.
-    Otherwise it must be a unicode string and is encoded as utf8.
-    """
-    return s if isinstance(s, bytes) else s.encode("utf-8")
+from .helper.converter import to_vname
+from .helper.imports_ import TextIO, contextlib, copy, re, sys
+from .patterns import patterns
 
 
 # --------------------------------- Main classes -------------------------------
-class ContentDict(dict):
-    def __setattr__(self, key, value):
-        if type(value) is list:
-            if key.endswith("_list"):
-                key = key[:-5]
-        elif key.endswith("_list"):
-            raise VObjectError("Component list set to a non-list")
-        else:
-            value = [value]
-        object.__setattr__(self, to_vname(key), value)
-
-    def __delattr__(self, key):
-        if key.endswith("_list"):
-            key = key[:-5]
-        object.__delattr__(self, to_vname(key))
-
-
 class VBase:
     """
     Base class for ContentLine and Component.
@@ -211,19 +179,6 @@ class VBase:
         else:
             logger.debug(f"serializing {self.name!s} without behavior")
             return default_serialize(self, buf, line_length)
-
-
-@lru_cache(32)
-def to_vname(name, strip_num=0, upper=False):
-    """
-    Turn a Python name into an iCalendar style name,
-    optionally uppercase and with characters stripped off.
-    """
-    if upper:
-        name = name.upper()
-    if strip_num != 0:
-        name = name[:-strip_num]
-    return name.replace("_", "-")
 
 
 class ContentLine(VBase):
@@ -395,6 +350,31 @@ class ContentLine(VBase):
             print(pre, "params for ", f"{self.name}:")
             for k in self.params.keys():
                 print(pre + " " * tabwidth, k, self.params[k])
+
+    def default_serialize(self, outbuf, line_length):
+        started_encoded = self.encoded
+        if self.behavior and not started_encoded:
+            self.behavior.encode(self)
+
+        s = get_buffer()
+
+        if self.group is not None:
+            s.write(f"{self.group}.")
+        s.write(self.name.upper())
+        keys = sorted(self.params.keys())
+        for key in keys:
+            paramstr = ",".join(dquote_escape(p) for p in self.params[key])
+            try:
+                s.write(f";{key}={paramstr}")
+            except (UnicodeDecodeError, UnicodeEncodeError):
+                s.write(f";{key}={paramstr.encode('utf-8')}")
+        try:
+            s.write(f":{self.value}")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            s.write(f":{self.value.encode('utf-8')}")
+        if self.behavior and not started_encoded:
+            self.behavior.decode(self)
+        fold_one_line(outbuf, s.getvalue(), line_length)
 
 
 class Component(VBase):
@@ -615,74 +595,36 @@ class Component(VBase):
             for line in self.get_children():
                 line.pretty_print(level + 1, tabwidth)
 
+    def default_serialize(self, output_buffer, line_length):
+        group_string = "" if self.group is None else f"{self.group}."
+        if self.use_begin:
+            fold_one_line(output_buffer, f"{group_string}BEGIN:{self.name}", line_length)
+        for child in self.get_sorted_children():
+            # validate is recursive, we only need to validate once
+            child.serialize(output_buffer, line_length, validate=False)
+        if self.use_begin:
+            fold_one_line(output_buffer, f"{group_string}END:{self.name}", line_length)
+
+
+class ComponentStack(Stack):
+    def modify_top(self, item):
+        top = self.top()
+        if top:
+            top.add(item)
+        else:
+            new = Component()
+            self.push(new)
+            new.add(item)  # add sets behavior for item and children
+
 
 # --------- Parsing functions and parse_line regular expressions ----------------
-
-# Note that underscore is not legal for names, it's included because
-# Lotus Notes uses it
-patterns = {"name": "[a-zA-Z0-9_-]+", "safe_char": '[^";:,]', "qsafe_char": '[^"]'}
-# the combined Python string replacement and regex syntax is a little confusing;
-# remember that {foobar} is replaced with patterns['foobar'], so for instance
-# param_value is any number of safe_chars or any number of qsaf_chars surrounded
-# by double quotes.
-
-patterns["param_value"] = ' "{qsafe_char!s} * " | {safe_char!s} * '.format(**patterns)
-
-# get a tuple of two elements, one will be empty, the other will have the value
-patterns["param_value_grouped"] = (
-    """
-" ( {qsafe_char!s} * )" | ( {safe_char!s} + )
-""".format(
-        **patterns
-    )
-)
-
-# get a parameter and its values, without any saved groups
-patterns["param"] = (
-    r"""
-; (?: {name!s} )                     # parameter name
-(?:
-    (?: = (?: {param_value!s} ) )?   # 0 or more parameter values, multiple
-    (?: , (?: {param_value!s} ) )*   # parameters are comma separated
-)*
-""".format(
-        **patterns
-    )
-)
-
-# get a parameter, saving groups for name and value (value still needs parsing)
-patterns["params_grouped"] = (
-    r"""
-; ( {name!s} )
-
-(?: =
-    (
-        (?:   (?: {param_value!s} ) )?   # 0 or more parameter values, multiple
-        (?: , (?: {param_value!s} ) )*   # parameters are comma separated
-    )
-)?
-""".format(
-        **patterns
-    )
-)
-
-# get a full content line, break it up into group, name, parameters, and value
-patterns["line"] = (
-    r"""
-^ ((?P<group> {name!s})\.)?(?P<name> {name!s}) # name group
-  (?P<params> ;?(?: {param!s} )* )               # params group (may be empty)
-: (?P<value> .* )$                             # value group
-""".format(
-        **patterns
-    )
-)
-
-' "%(qsafe_char)s*" | %(safe_char)s* '  # what is this line?? - never assigned?
-
 param_values_re = re.compile(patterns["param_value_grouped"], re.VERBOSE)
 params_re = re.compile(patterns["params_grouped"], re.VERBOSE)
 line_re = re.compile(patterns["line"], re.DOTALL | re.VERBOSE)
 begin_re = re.compile("BEGIN", re.IGNORECASE)
+
+wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
+logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
 
 
 def parse_params(string):
@@ -717,27 +659,6 @@ def parse_line(line, line_number=None):
         match.group("value"),
         match.group("group"),
     )
-
-
-# logical line regular expressions
-
-patterns["lineend"] = r"(?:\r\n|\r|\n|$)"
-patterns["wrap"] = rf"{patterns['lineend']!s} [\t ]"
-patterns["logicallines"] = (
-    r"""
-(
-   (?: [^\r\n] | {wrap!s} )*
-   {lineend!s}
-)
-""".format(
-        **patterns
-    )
-)
-
-patterns["wraporend"] = r"({wrap!s} | {lineend!s} )".format(**patterns)
-
-wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
-logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
 
 
 def get_logical_lines(fp, allow_qp=True):
@@ -835,145 +756,70 @@ def default_serialize(obj, buf, line_length):
     Encode and fold obj and its children, write to buf or return a string.
     """
     outbuf = buf or get_buffer()
-
-    if isinstance(obj, Component):
-        group_string = "" if obj.group is None else f"{obj.group}."
-        if obj.use_begin:
-            fold_one_line(outbuf, f"{group_string}BEGIN:{obj.name}", line_length)
-        for child in obj.get_sorted_children():
-            # validate is recursive, we only need to validate once
-            child.serialize(outbuf, line_length, validate=False)
-        if obj.use_begin:
-            fold_one_line(outbuf, f"{group_string}END:{obj.name}", line_length)
-
-    elif isinstance(obj, ContentLine):
-        started_encoded = obj.encoded
-        if obj.behavior and not started_encoded:
-            obj.behavior.encode(obj)
-
-        s = get_buffer()
-
-        if obj.group is not None:
-            s.write(f"{obj.group}.")
-        s.write(obj.name.upper())
-        keys = sorted(obj.params.keys())
-        for key in keys:
-            paramstr = ",".join(dquote_escape(p) for p in obj.params[key])
-            try:
-                s.write(f";{key}={paramstr}")
-            except (UnicodeDecodeError, UnicodeEncodeError):
-                s.write(f";{key}={paramstr.encode('utf-8')}")
-        try:
-            s.write(f":{obj.value}")
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            s.write(f":{obj.value.encode('utf-8')}")
-        if obj.behavior and not started_encoded:
-            obj.behavior.decode(obj)
-        fold_one_line(outbuf, s.getvalue(), line_length)
-
+    if isinstance(obj, (Component, ContentLine)):
+        obj.default_serialize(outbuf, line_length)
     return buf or outbuf.getvalue()
-
-
-class Stack:
-    def __init__(self):
-        self.stack = []
-
-    def __len__(self):
-        return len(self.stack)
-
-    def top(self):
-        return self.stack[-1] if self.stack else None
-
-    def top_name(self):
-        return self.stack[-1].name if self.stack else None
-
-    def modify_top(self, item):
-        top = self.top()
-        if top:
-            top.add(item)
-        else:
-            new = Component()
-            self.push(new)
-            new.add(item)  # add sets behavior for item and children
-
-    def push(self, obj):
-        self.stack.append(obj)
-
-    def pop(self):
-        return self.stack.pop()
 
 
 def read_components(stream_or_string, validate=False, transform=True, ignore_unreadable=False, allow_qp=False):
     """
     Generate one Component at a time from a stream.
     """
-    if isinstance(stream_or_string, str):
-        stream = get_buffer(stream_or_string)
-    else:
-        stream = stream_or_string
 
-    try:
-        stack = Stack()
-        version_line = None
-        n = 0
-        for line, n in get_logical_lines(stream, allow_qp):
+    def raise_parse_error(msg):
+        raise ParseError(msg, n, inputs=stream_or_string)
+
+    stream = get_buffer(stream_or_string)
+    stack = ComponentStack()
+    n, version_line = 0, None
+
+    for line, n in get_logical_lines(stream, allow_qp):
+        # 1. Get vline
+        try:
+            vline = text_line_to_content_line(line, n)
+        except VObjectError as e:
             if ignore_unreadable:
-                try:
-                    vline = text_line_to_content_line(line, n)
-                except VObjectError as e:
-                    if e.line_number is not None:
-                        msg = "Skipped line {line_number}, message: {msg}"
-                    else:
-                        msg = "Skipped a line, message: {msg}"
-                    logger.error(msg.format(**{"line_number": e.line_number, "msg": str(e)}))
-                    continue
-            else:
-                vline = text_line_to_content_line(line, n)
-            if vline.name == "VERSION":
-                version_line = vline
-                stack.modify_top(vline)
-            elif vline.name == "BEGIN":
-                stack.push(Component(vline.value, group=vline.group))
-            elif vline.name == "PROFILE":
-                if not stack.top():
-                    stack.push(Component())
-                stack.top().set_profile(vline.value)
-            elif vline.name == "END":
-                if len(stack) == 0:
-                    err = "Attempted to end the {0} component but it was never opened"
-                    raise ParseError(err.format(vline.value), n)
+                logger.error(f"Skipped line: {e.line_number or '?'}, message: {str(e)}")
+                continue
+            raise e
 
-                if vline.value.upper() == stack.top_name():  # START matches END
-                    if len(stack) == 1:
-                        component = stack.pop()
-                        if version_line is not None:
-                            component.set_behavior_from_version_line(version_line)
-                        else:
-                            behavior = get_behavior(component.name)
-                            if behavior:
-                                component.set_behavior(behavior)
-                        if validate:
-                            component.validate(raise_exception=True)
-                        if transform:
-                            component.transform_children_to_native()
-                        yield component  # EXIT POINT
-                    else:
-                        stack.modify_top(stack.pop())
-                else:
-                    err = "{0} component wasn't closed"
-                    raise ParseError(err.format(stack.top_name()), n)
-            else:
-                stack.modify_top(vline)  # not a START or END line
-        if stack.top():
-            if stack.top_name() is None:
-                logger.warning("Top level component was never named")
-            elif stack.top().use_begin:
-                raise ParseError(f"Component {(stack.top_name())!s} was never closed", n)
-            yield stack.pop()
+        # 2. Parse vline
+        if vline.name == "VERSION":
+            version_line = vline
+            stack.modify_top(vline)
+        elif vline.name == "BEGIN":
+            stack.push(Component(vline.value, group=vline.group))
+        elif vline.name == "PROFILE":
+            if not stack.top():
+                stack.push(Component())
+            stack.top().set_profile(vline.value)
+        elif vline.name == "END":
+            if not stack:
+                raise raise_parse_error(f"Attempted to end the {vline.value} component but it was never opened")
+            if vline.value.upper() != stack.top_name():
+                raise raise_parse_error(f"{stack.top_name()} component wasn't closed")
 
-    except ParseError as e:
-        e.input = stream_or_string
-        raise
+            # START matches END
+            if len(stack) == 1:
+                component: Component = stack.pop()
+                component.set_behavior_from_version_line(version_line)
+
+                if validate:
+                    component.validate(raise_exception=True)
+                if transform:
+                    component.transform_children_to_native()
+                yield component  # EXIT POINT
+            else:
+                stack.modify_top(stack.pop())
+        else:
+            stack.modify_top(vline)  # not a START or END line
+
+    if stack.top():
+        if stack.top_name() is None:
+            logger.warning("Top level component was never named")
+        elif stack.top().use_begin:
+            raise raise_parse_error(f"Component {(stack.top_name())!s} was never closed")
+        yield stack.pop()
 
 
 def read_one(stream, validate=False, transform=True, ignore_unreadable=False, allow_qp=False):
