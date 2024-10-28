@@ -1,5 +1,5 @@
-name: build
-on: [ push ]
+name: unit-test
+on: [ pull_request ]
 jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: ubuntu-latest
