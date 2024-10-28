@@ -13,12 +13,13 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
+      - id: check-toml
       - id: end-of-file-fixer
       - id: no-commit-to-branch
-        args: [-b, main, -b, master]
+        args: [ -b, main, -b, master ]
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.1
     hooks:
       - id: flake8
-        additional_dependencies: [flake8-pyproject]
+        additional_dependencies: [ flake8-pyproject ]
