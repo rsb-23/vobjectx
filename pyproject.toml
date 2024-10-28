@@ -41,7 +41,7 @@ ics_diff = "vobject.ics_diff:main"
 change_tz = "vobject.change_tz:main"
 
 [project.urls]
-Homepage = ""
+Homepage = "https://github.com/rsb-23/vobjectx"
 Repository = "https://github.com/rsb-23/vobjectx"
 Issues = "https://github.com/rsb-23/vobjectx/issues"
 Releases = "https://github.com/rsb-23/vobjectx/releases"
