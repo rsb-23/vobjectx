@@ -1,7 +1,7 @@
-name: build
-on: [push]
+name: unit-test
+on: [ pull_request ]
 jobs:
-  coverage-test:  # Tests code for base version and coverage
+  coverage-test: # Tests code for base version and coverage
     runs-on: ubuntu-latest
     steps:
       - name: Code checkout
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python ${{ matrix.python-version }}

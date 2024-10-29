@@ -77,10 +77,11 @@ VObject Overview
 """
 
 from . import icalendar, vcard
+from .__about__ import __version__
 from .base import new_from_behavior, read_components, read_one
 
 # Package version
-VERSION = "0.1.0"
+VERSION = __version__
 
 
 # noinspection PyPep8Naming
