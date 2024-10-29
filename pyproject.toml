@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "vobjectx"
 dynamic = ["version"]
 description = "A full-featured Python3 package for parsing and creating \"iCalendar and vCard files\""
-readme = "README_.md"
+readme = "README.md"
 authors = [
     { name = "Jeffrey Harris", email = "jeffrey@osafoundation.org" },
     { name = "David Arnold", email = "davida@pobox.com" },
