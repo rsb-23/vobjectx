@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from io import StringIO
 
@@ -11,5 +13,5 @@ if not logging.getLogger().handlers:
 logger.setLevel(logging.INFO)  # modify log levels here
 
 
-def get_buffer(x=None):
-    return StringIO(x)
+def get_buffer(x: str | StringIO = None) -> StringIO:
+    return StringIO(x) if isinstance(x, str) or x is None else x

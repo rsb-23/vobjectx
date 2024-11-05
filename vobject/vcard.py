@@ -1,8 +1,11 @@
 """Definitions and behavior for vCard 3.0"""
 
+from __future__ import annotations
+
 from .base import ContentLine, register_behavior
 from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder
+from .helper.converter import to_list, to_string
 from .icalendar import string_to_text_values
 
 # ------------------------ vCard structs ---------------------------------------
@@ -19,16 +22,9 @@ class Name:
         self.prefix = prefix
         self.suffix = suffix
 
-    @staticmethod
-    def to_string(val):
-        """
-        Turn a string or array value into a string.
-        """
-        return " ".join(val) if type(val) in (list, tuple) else val
-
     def __str__(self):
         eng_order = ("prefix", "given", "additional", "family", "suffix")
-        return " ".join(self.to_string(getattr(self, val)) for val in eng_order)
+        return " ".join(to_string(getattr(self, val)) for val in eng_order)
 
     def __repr__(self):
         return f"<Name: {self!s}>"
@@ -59,22 +55,15 @@ class Address:
         self.code = code
         self.country = country
 
-    @staticmethod
-    def to_string(val, join_char="\n"):
-        """
-        Turn a string or array value into a string.
-        """
-        return join_char.join(val) if type(val) in (list, tuple) else val
-
     lines = ("box", "extended", "street")
     one_line = ("city", "region", "code")
 
     def __str__(self):
-        lines = "\n".join(self.to_string(getattr(self, val)) for val in self.lines if getattr(self, val))
-        one_line = tuple(self.to_string(getattr(self, val), " ") for val in self.one_line)
+        lines = "\n".join(to_string(getattr(self, val), "\n") for val in self.lines if getattr(self, val))
+        one_line = tuple(to_string(getattr(self, val)) for val in self.one_line)
         lines += "\n{0!s}, {1!s} {2!s}".format(*one_line)
         if self.country:
-            lines += "\n" + self.to_string(self.country)
+            lines += "\n" + to_string(self.country, "\n")
         return lines
 
     def __repr__(self):
@@ -113,10 +102,10 @@ class VCardTextBehavior(Behavior):
     def decode(cls, line):
         """
         Remove backslash escaping from line.value_decode line, either to remove
-        backslash espacing, or to decode base64 encoding. The content line should
+        backslash escaping, or to decode base64 encoding. The content line should
         contain a ENCODING=b for base64 encoding, but Apple Addressbook seems to
         export a singleton parameter of 'BASE64', which does not match the 3.0
-        vCard spec. If we encouter that, then we transform the parameter to
+        vCard spec. If we encounter that, then we transform the parameter to
         ENCODING=b
         """
         if line.encoded:
@@ -125,7 +114,7 @@ class VCardTextBehavior(Behavior):
                 line.encoding_param = cls.base64string
             encoding = getattr(line, "encoding_param", None)
             if encoding:
-                line.value = byte_decoder(line.value, "base64")
+                line.value = byte_decoder(line.value)
             else:
                 line.value = string_to_text_values(line.value)[0]
             line.encoded = False
@@ -214,13 +203,12 @@ class GEO(VCardBehavior):
 
 register_behavior(GEO)
 
-WACKY_APPLE_PHOTO_SERIALIZE = True
-REALLY_LARGE = 1e50
-
 
 class Photo(VCardTextBehavior):
     name = "Photo"
     description = "Photograph"
+    WACKY_APPLE_PHOTO_SERIALIZE = True
+    REALLY_LARGE = 1e50
 
     @classmethod
     def value_repr(cls, line):
@@ -233,15 +221,15 @@ class Photo(VCardTextBehavior):
         base64 data to have very specific whitespace.  It seems Address Book
         can handle PHOTO if it's not wrapped, so don't wrap it.
         """
-        if WACKY_APPLE_PHOTO_SERIALIZE:
-            line_length = REALLY_LARGE
+        if cls.WACKY_APPLE_PHOTO_SERIALIZE:
+            line_length = cls.REALLY_LARGE
         VCardTextBehavior.serialize(obj, buf, line_length, validate, *args, **kwargs)
 
 
 register_behavior(Photo)
 
 
-def to_list_or_string(string):
+def to_list_or_string(string) -> str | list:
     string_list = string_to_text_values(string)
     return string_list[0] if len(string_list) == 1 else string_list
 
@@ -253,13 +241,9 @@ def split_fields(string):
     return [to_list_or_string(i) for i in string_to_text_values(string, list_separator=";", char_list=";")]
 
 
-def to_list(string_or_list):
-    return [string_or_list] if isinstance(string_or_list, str) else string_or_list
-
-
 def serialize_fields(obj, order=None):
     """
-    Turn an object's fields into a ';' and ',' seperated string.
+    Turn an object's fields into a ';' and ',' separated string.
 
     If order is None, obj should be a list, backslash escape each field and
     return a ';' separated string.
@@ -274,35 +258,32 @@ def serialize_fields(obj, order=None):
     return ";".join(fields)
 
 
-NAME_ORDER = ("family", "given", "additional", "prefix", "suffix")
-ADDRESS_ORDER = ("box", "extended", "street", "city", "region", "code", "country")
-
-
 class NameBehavior(VCardBehavior):
     """
     A structured name.
     """
 
     has_native = True
+    field_order = "family", "given", "additional", "prefix", "suffix"
 
-    @staticmethod
-    def transform_to_native(obj):
+    @classmethod
+    def transform_to_native(cls, obj):
         """
         Turn obj.value into a Name.
         """
         if obj.is_native:
             return obj
         obj.is_native = True
-        obj.value = Name(**dict(zip(NAME_ORDER, split_fields(obj.value))))
+        obj.value = Name(**dict(zip(cls.field_order, split_fields(obj.value))))
         return obj
 
-    @staticmethod
-    def transform_from_native(obj):
+    @classmethod
+    def transform_from_native(cls, obj):
         """
         Replace the Name in obj.value with a string.
         """
         obj.is_native = False
-        obj.value = serialize_fields(obj.value, NAME_ORDER)
+        obj.value = serialize_fields(obj.value, cls.field_order)
         return obj
 
 
@@ -315,25 +296,26 @@ class AddressBehavior(VCardBehavior):
     """
 
     has_native = True
+    field_order = "box", "extended", "street", "city", "region", "code", "country"
 
-    @staticmethod
-    def transform_to_native(obj):
+    @classmethod
+    def transform_to_native(cls, obj):
         """
         Turn obj.value into an Address.
         """
         if obj.is_native:
             return obj
         obj.is_native = True
-        obj.value = Address(**dict(zip(ADDRESS_ORDER, split_fields(obj.value))))
+        obj.value = Address(**dict(zip(cls.field_order, split_fields(obj.value))))
         return obj
 
-    @staticmethod
-    def transform_from_native(obj):
+    @classmethod
+    def transform_from_native(cls, obj):
         """
         Replace the Address in obj.value with a string.
         """
         obj.is_native = False
-        obj.value = serialize_fields(obj.value, ADDRESS_ORDER)
+        obj.value = serialize_fields(obj.value, cls.field_order)
         return obj
 
 

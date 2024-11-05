@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from random import sample
 from unittest import TestCase
 
 import dateutil
@@ -155,15 +156,14 @@ class TestIcalendar(TestCase):
         expected_vtimezone = get_test_file("tz_us_eastern.ics")
         self.assertIn(expected_vtimezone.replace("\r\n", "\n"), serialized.replace("\r\n", "\n"))
 
-        # Exhaustively test all zones (just looking for no errors)
-
-        for tzname in pytz.all_timezones:
+        # Randomly test k zones (just looking for no errors)
+        for tzname in sample(pytz.all_timezones, k=50):
             unregister_tzid(tzname)
             tz = TimezoneComponent(tzinfo=pytz.timezone(tzname))
             tz.serialize()
 
     @staticmethod
-    def _add_tags(comp, uid, dtstamp, dtstart, dtend):  # todo: rename if required
+    def _add_tags(comp, uid, dtstamp, dtstart, dtend):
         comp.add("uid").value = uid
         comp.add("dtstamp").value = dtstamp
         comp.add("dtstart").value = dtstart

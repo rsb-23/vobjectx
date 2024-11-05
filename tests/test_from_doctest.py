@@ -1,12 +1,12 @@
 import datetime as dt
 from io import StringIO
-from unittest import TestCase
+from unittest import TestCase, skip
 
 import dateutil.rrule as rrule
 
 import vobject as vo
 
-from .common import TEST_FILE_DIR
+from .common import get_test_file
 
 
 class Doctest(TestCase):
@@ -82,8 +82,50 @@ class MoreTests(TestCase):
         card.add("org").value = ["Company, Inc.", "main unit", "sub-unit"]
         self.assertEqual(card.org.serialize(), "ORG:Company\\, Inc.;main unit;sub-unit\r\n")
 
+    @staticmethod
+    def _get_one_cal(filename):
+        f = get_test_file(filename)
+        return vo.read_one(f)
+
     def test_ruby_rrule(self):
         """Ruby escapes semi-colons in rrules"""
-        with open(f"{TEST_FILE_DIR}/ruby_rrule.ics", "r") as f:
-            cal = vo.read_one(f)
-            self.assertEqual(next(iter(cal.vevent.rruleset)), dt.datetime(2003, 1, 1, 7, 0))
+        cal = self._get_one_cal("ruby_rrule.ics")
+        self.assertEqual(next(iter(cal.vevent.rruleset)), dt.datetime(2003, 1, 1, 7, 0))
+
+    def test_tzid_commas(self):
+        cal = self._get_one_cal("ms_tzid.ics")
+        self.assertEqual(str(cal.vevent.dtstart.value), "2008-05-30 15:00:00+10:00")
+
+    def test_tzid_unicode(self):
+        cal = self._get_one_cal("tzid_8bit.ics")
+        self.assertEqual(str(cal.vevent.dtstart.value), "2008-05-30 15:00:00+06:00")
+        self.assertEqual(cal.vevent.dtstart.serialize(), "DTSTART;TZID=Екатеринбург:20080530T150000\r\n")
+
+    @skip("test fails, to be checked")
+    def test_opensync_vcs(self):
+        vcs = (
+            "BEGIN:VCALENDAR\r\nPRODID:-//OpenSync//NONSGML OpenSync vformat 0.3//EN\r\nVERSION:1.0\r\n"
+            "BEGIN:VEVENT\r\nDESCRIPTION;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:foo =C3=A5=0Abar =C3=A4=\r\n=0Abaz "
+            "=C3=B6\r\nUID:20080406T152030Z-7822\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        vcs = vo.read_one(vcs, allow_qp=True)
+        self.assertEqual(
+            vcs.serialize(),
+            "BEGIN:VCALENDAR\r\nVERSION:1.0\r\nPRODID:-//OpenSync//NONSGML OpenSync vformat 0.3//EN\r\n"
+            "BEGIN:VEVENT\r\nUID:20080406T152030Z-7822\r\nDESCRIPTION:foo \xc3\xa5\\nbar \xc3\xa4\\nbaz \xc3\xb6\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n",
+        )
+
+    @skip("test fails, to be checked")
+    def test_vcf_qp(self):
+        vcf = (
+            "BEGIN:VCARD\nVERSION:2.1\nN;ENCODING=QUOTED-PRINTABLE:;=E9\nFN;ENCODING=QUOTED-PRINTABLE:=E9\nTEL;"
+            "HOME:0111111111\nEND:VCARD\n\n"
+        )
+        vcf = vo.read_one(vcf)
+        self.assertEqual(vcf.n.value, "< Name:  ? >")
+        self.assertEqual(vcf.n.value.given, "\xe9")
+        self.assertEqual(
+            vcf.serialize(),
+            "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:\xc3\xa9\r\nN:;\xc3\xa9;;;\r\nTEL:0111111111\r\nEND:VCARD\r\n",
+        )

@@ -58,8 +58,7 @@ class Behavior:
     sort_first = []
 
     def __init__(self):
-        err = "Behavior subclasses are not meant to be instantiated"
-        raise VObjectError(err)
+        raise VObjectError("Behavior subclasses are not meant to be instantiated")
 
     @classmethod
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
@@ -77,8 +76,7 @@ class Behavior:
 
         """
         if not cls.allow_group and obj.group is not None:
-            err = f"{obj} has a group, but this object doesn't support groups"
-            raise VObjectError(err)
+            raise VObjectError(f"{obj} has a group, but this object doesn't support groups")
         if isinstance(obj, ContentLine):
             return cls.line_validate(obj, raise_exception, complain_unrecognized)
         elif isinstance(obj, Component):
@@ -101,8 +99,7 @@ class Behavior:
                     return False
             return True
         else:
-            err = f"{obj} is not a Component or Contentline"
-            raise VObjectError(err)
+            raise VObjectError(f"{obj} is not a Component or Contentline")
 
     @classmethod
     def line_validate(cls, line, raise_exception, complain_unrecognized):
