@@ -10,3 +10,5 @@ vobject.egg-info/**/*
 venv/
 *.sublime-*
 .coverage
+
+new/

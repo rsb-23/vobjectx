@@ -6,6 +6,7 @@ rule_settings:
     - no-loop-in-tests
     - no-conditionals-in-tests
     - use-named-expression
+    - raise-from-previous-error
   rule_types:
     - refactoring
     - suggestion
