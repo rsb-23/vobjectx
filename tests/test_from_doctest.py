@@ -49,7 +49,7 @@ class Doctest(TestCase):
 
         self.assertEqual(
             x.serialize(),
-            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PYVOBJECT//NONSGML Version 1//EN\r\n"
+            f"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VOBJECTX//NONSGML Version {vo.VERSION}//EN\r\n"
             "BEGIN:VEVENT\r\nUID:randomuid@MYHOSTNAME\r\nDTSTART:20041215T140000Z\r\n"
             "DTSTAMP:20060215T000000Z\r\n"  # not in actual test, newly added
             "RRULE:FREQ=WEEKLY;COUNT=2\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
