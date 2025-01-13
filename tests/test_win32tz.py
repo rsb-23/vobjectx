@@ -9,7 +9,7 @@ if sys.platform == "win32":
 @skipUnless(sys.platform == "win32", "This is windows specific module")
 class TestWin32tz(TestCase):
     def setUp(self):
-        self.local = Win32tz("Central Standard Time")
+        self.local = Win32tz("Central Standard Time")  # pylint:disable=e0606
         self.oct1 = dt.datetime(month=10, year=2004, day=1, tzinfo=self.local)
         self.dec1 = dt.datetime(month=12, year=2004, day=1, tzinfo=self.local)
         self.braz = Win32tz("E. South America Standard Time")

@@ -8,4 +8,4 @@ import sys
 from functools import lru_cache, partial
 from typing import TextIO
 
-__all__ = [base64, contextlib, copy, re, sys, lru_cache, partial, TextIO]
+__all__ = ["base64", "contextlib", "copy", "re", "sys", "lru_cache", "partial", "TextIO"]

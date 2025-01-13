@@ -42,7 +42,7 @@ class Win32tz(datetime.tzinfo):
         if dston < dstoff:
             return dston <= dt.replace(tzinfo=None) < dstoff
 
-        return not (dstoff <= dt.replace(tzinfo=None) < dston)
+        return not (dstoff <= dt.replace(tzinfo=None) < dston)  # pylint:disable=superfluous-parens
 
     def __repr__(self):
         return f"<win32tz - {self.data.display!s}>"
@@ -56,10 +56,13 @@ def pick_nth_weekday(year, month, dayofweek, hour, minute, whichweek):
         dt = weekdayone + n * WEEKS
         if dt.month == month:
             return dt
+    return None
 
 
 class Win32tzData:
     """Read a registry key for a timezone, expose its contents."""
+
+    # pylint: disable=r0902
 
     def __init__(self, path):
         """Load path, or if path is empty, load local time."""
@@ -110,7 +113,7 @@ def values_to_dict(key):
 def _test():
     import doctest
 
-    import win32tz  # pylint: disable=import-error
+    import win32tz
 
     doctest.testmod(win32tz, verbose=False)
 
