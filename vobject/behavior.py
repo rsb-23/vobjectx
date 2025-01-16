@@ -104,7 +104,7 @@ class Behavior:
     @classmethod
     def line_validate(cls, line, raise_exception, complain_unrecognized):
         """Examine a line's parameters and values, return True if valid."""
-        # todo: remove used param line, raise_exception, complain_unrecognized
+        # TODO: remove used param line, raise_exception, complain_unrecognized
         if any([line, raise_exception, complain_unrecognized]):
             pass
         return True
@@ -142,7 +142,7 @@ class Behavior:
         """Generate any required information that don't yet exist."""
 
     @classmethod
-    def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):
+    def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):  # pylint:disable=unused-argument
         """
         Set implicit parameters, do encoding, return unicode string.
 

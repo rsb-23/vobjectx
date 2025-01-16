@@ -79,8 +79,7 @@ class HCalendar(VCalendar2_0):
                     timeformat = "%A, %B %e, %H:%M"
                     machine = "%Y%m%dT%H%M%S%z"
 
-                # TODO: Handle non-datetime formats?
-                # TODO: Spec says we should handle when dtstart isn't included
+                # TODO: Handle non-datetime formats? Spec says we should handle when dtstart isn't included
 
                 buffer_write(
                     f'<abbr class="dtstart", title="{dtstart.strftime(machine)}">{dtstart.strftime(timeformat)}</abbr>'

@@ -30,10 +30,9 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: pylint vobject tests
+        entry: pylint
         language: system
-        types: [python]
-        require_serial: true
+        types: [ python ]
         args:
           [
             "-rn", # Only display messages

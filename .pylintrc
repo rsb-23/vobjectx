@@ -1,11 +1,21 @@
 [MASTER]
 jobs=2
+ignore-paths=(?!(vobject|tests))/*
 
 [FORMAT]
 max-line-length = 130
 
+[REFACTORING]
+max-args=8
+max-attributes = 9
+max-branches = 30
+max-locals = 31
+max-positional-arguments = 8
+max-statements = 77
+
 [MESSAGES CONTROL]
 disable=
+    I,
     import-error,
     # Warnings
     fixme,
@@ -13,7 +23,6 @@ disable=
     logging-fstring-interpolation,
     protected-access,
     unspecified-encoding,
-    unused-argument,
     # Conventions
     import-outside-toplevel,
     missing-docstring,
@@ -22,10 +31,3 @@ disable=
     duplicate-code,
     no-else-return,
     too-few-public-methods,
-[REFACTORING]
-max-args=8
-max-attributes = 9
-max-branches = 30
-max-locals = 31
-max-positional-arguments = 8
-max-statements = 100
