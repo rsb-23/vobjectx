@@ -80,7 +80,7 @@ class VBase:
                 behavior = get_behavior(self.name, known_child_tup[2])
                 if behavior is not None:
                     self.set_behavior(behavior, cascade)
-                    if isinstance(self, ContentLine) and self.encoded:
+                    if isinstance(self, ContentLine) and self.encoded:  # pylint:disable=e1101
                         self.behavior.decode(self)
             elif isinstance(self, ContentLine):
                 self.behavior = parent_behavior.default_behavior
@@ -111,19 +111,17 @@ class VBase:
         self_orig = copy.copy(self)
         try:
             return self.behavior.transform_to_native(self)
+        except ParseError as e:
+            e.line_number = getattr(self, "line_number", None)
+            raise
         except VObjectError as e:
-            # wrap errors in transformation in a ParseError
-            line_number = getattr(self, "line_number", None)
+            e.line_number = getattr(self, "line_number", None)
 
-            if isinstance(e, ParseError):
-                if line_number is not None:
-                    e.line_number = line_number
-                raise
-            else:
-                msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
-                msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
-                msg = f"{msg} ({str(self_orig)})"
-                raise ParseError(msg, line_number) from e
+            # wrap errors in transformation in a ParseError
+            msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
+            msg = msg.format(e.line_number, sys.exc_info()[0], sys.exc_info()[1])
+            msg = f"{msg} ({str(self_orig)})"
+            raise ParseError(msg, e.line_number) from e
 
     def transform_from_native(self):
         """
@@ -147,13 +145,12 @@ class VBase:
             # wrap errors in transformation in a NativeError
             line_number = getattr(self, "line_number", None)
             if isinstance(e, NativeError):
-                if line_number is not None:
-                    e.line_number = line_number
+                e.line_number = line_number
                 raise
-            else:
-                msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
-                msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
-                raise NativeError(msg, line_number) from e
+
+            msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
+            msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
+            raise NativeError(msg, line_number) from e
 
     def transform_children_to_native(self):
         """
@@ -176,9 +173,9 @@ class VBase:
         if behavior:
             logger.debug(f"serializing {self.name!s} with behavior {behavior!s}")
             return behavior.serialize(self, buf, line_length, validate, *args, **kwargs)
-        else:
-            logger.debug(f"serializing {self.name!s} without behavior")
-            return default_serialize(self, buf, line_length)
+
+        logger.debug(f"serializing {self.name!s} without behavior")
+        return default_serialize(self, buf, line_length)
 
 
 class ContentLine(VBase):
@@ -239,7 +236,7 @@ class ContentLine(VBase):
         if "ENCODING" in self.params and "QUOTED-PRINTABLE" in self.params["ENCODING"]:
             qp = True
             self.params["ENCODING"].remove("QUOTED-PRINTABLE")
-            if len(self.params["ENCODING"]) == 0:
+            if not self.params["ENCODING"]:
                 del self.params["ENCODING"]
         if "QUOTED-PRINTABLE" in self.singletonparams:
             qp = True
@@ -521,7 +518,7 @@ class Component(VBase):
         if named:
             with contextlib.suppress(ValueError):
                 named.remove(obj)
-                if len(named) == 0:
+                if not named:
                     del self.contents[obj.name.lower()]
 
     def get_children(self):
@@ -678,7 +675,7 @@ def get_logical_lines(fp, allow_qp=True):
         line_number = 1
         for match in logical_lines_re.finditer(val):
             line, n = wrap_re.subn("", match.group())
-            if line != "":
+            if line:
                 yield line, line_number
             line_number += n
 

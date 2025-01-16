@@ -1,3 +1,4 @@
+# pylint: disable=c0302
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
 from __future__ import annotations
@@ -33,16 +34,12 @@ __tzid_map = {}
 
 
 def register_tzid(tzid, tzinfo):
-    """
-    Register a tzid -> tzinfo mapping.
-    """
+    """Register a tzid -> tzinfo mapping."""
     __tzid_map[to_unicode(tzid)] = tzinfo
 
 
 def get_tzid(tzid, smart=True):
-    """
-    Return the tzid if it exists, or None.
-    """
+    """Return the tzid if it exists, or None."""
     _tz = __tzid_map.get(to_unicode(tzid))
     if smart and tzid and not _tz:
         try:
@@ -63,9 +60,8 @@ class TimezoneComponent(Component):
     """
     A VTIMEZONE object.
 
-    VTIMEZONEs are parsed by tz.tzical, the resulting dt.tzinfo
-    subclass is stored in self.tzinfo, self.tzid stores the TZID associated
-    with this timezone.
+    VTIMEZONEs are parsed by tz.tzical, the resulting dt.tzinfo subclass is stored in self.tzinfo, self.tzid stores
+    the TZID associated with this timezone.
 
     @ivar name:
         The uppercased name of the object, in this case always 'VTIMEZONE'.
@@ -137,8 +133,7 @@ class TimezoneComponent(Component):
         - twice or fewer times a year
         - never in the month of December
         - DST always moves offset exactly one hour later
-        - tzinfo classes dst method always treats times that could be in either
-          offset as being in the later regime
+        - tzinfo classes dst method always treats times that could be in either offset as being in the later regime
         """
 
         def from_last_week(dt_):
@@ -180,13 +175,12 @@ class TimezoneComponent(Component):
                     if oldrule is None:
                         # transition_to was not yet in effect
                         working[transition_to] = rule
-                    else:
-                        # transition_to was already in effect
-                        if oldrule["offset"] != tzinfo.utcoffset(newyear):
-                            # old rule was different, it shouldn't continue
-                            oldrule["end"] = year - 1
-                            completed[transition_to].append(oldrule)
-                            working[transition_to] = rule
+                    elif oldrule["offset"] != tzinfo.utcoffset(newyear):
+                        # transition_to was already in effect.
+                        # old rule was different, it shouldn't continue
+                        oldrule["end"] = year - 1
+                        completed[transition_to].append(oldrule)
+                        working[transition_to] = rule
                 elif transition is None:
                     # transition_to is not in effect
                     if oldrule is not None:
@@ -229,10 +223,8 @@ class TimezoneComponent(Component):
                             truth = truth and rule[key] == oldrule[key]
                         if truth:
                             # the old rule is still true, limit to plus or minus
-                            if not plus_match:
-                                oldrule["plus"] = None
-                            if not minus_match:
-                                oldrule["minus"] = None
+                            oldrule["plus"] = oldrule["plus"] if plus_match else None
+                            oldrule["minus"] = oldrule["minus"] if minus_match else None
                         else:
                             # the new rule did not match the old
                             oldrule["end"] = year - 1
@@ -262,17 +254,12 @@ class TimezoneComponent(Component):
                 line = comp.add("tzoffsetfrom")
                 line.value = delta_to_offset(rule["offsetfrom"])
 
-                if rule["plus"] is not None:
-                    num = rule["plus"]
-                elif rule["minus"] is not None:
-                    num = -1 * rule["minus"]
+                num = rule["plus"] or -1 * (rule["minus"] or 0)
+                day_string = f"BYDAY={num}{WEEKDAYS[rule['weekday']]}" if num else ""
+
+                if rule["end"] is None:
+                    end_string = ""
                 else:
-                    num = None
-                if num is not None:
-                    day_string = f";BYDAY={num}{WEEKDAYS[rule['weekday']]}"
-                else:
-                    day_string = ""
-                if rule["end"] is not None:
                     if rule["hour"] is None:
                         # all year offset, with no rule
                         end_date = dt.datetime(rule["end"], 1, 1)
@@ -286,12 +273,10 @@ class TimezoneComponent(Component):
                         )
                         end_date = du_rule[0]
                     end_date = end_date.replace(tzinfo=utc) - rule["offsetfrom"]
-                    end_string = f";UNTIL={datetime_to_string(end_date)}"
-                else:
-                    end_string = ""
-                new_rule = f"FREQ=YEARLY{day_string!s};BYMONTH={rule['month']!s}{end_string!s}"
+                    end_string = f"UNTIL={datetime_to_string(end_date)}"
 
-                comp.add("rrule").value = new_rule
+                new_rule = ";".join(["FREQ=YEARLY", day_string, f"BYMONTH={rule['month']}", end_string])
+                comp.add("rrule").value = new_rule.strip(";")
 
     @staticmethod
     def pick_tzid(tzinfo, allow_utc=False):
@@ -301,24 +286,19 @@ class TimezoneComponent(Component):
         if tzinfo is None or (not allow_utc and tzinfo_eq(tzinfo, utc)):
             # If tzinfo is UTC, we don't need a TZID
             return None
-        # try Pytz's tzid key
-        if hasattr(tzinfo, "tzid"):
-            return to_unicode(tzinfo.tzid)
 
-        # try pytz zone key
-        if hasattr(tzinfo, "zone"):
-            return to_unicode(tzinfo.zone)
+        for attr in ("tzid", "zone", "_tzid"):
+            tzid_ = getattr(tzinfo, attr, None)
+            if tzid_:
+                return to_unicode(tzid_)
 
-        # try tzical's tzid key
-        elif hasattr(tzinfo, "_tzid"):
-            return to_unicode(tzinfo._tzid)
-        else:
-            # return tzname for standard (non-DST) time
-            not_dst = dt.timedelta(0)
-            for month in range(1, 13):
-                _dt = dt.datetime(2000, month, 1)
-                if tzinfo.dst(_dt) == not_dst:
-                    return to_unicode(tzinfo.tzname(_dt))
+        # return tzname for standard (non-DST) time
+        not_dst = dt.timedelta(0)
+        for month in range(1, 13):
+            _dt = dt.datetime(2000, month, 1)
+            if tzinfo.dst(_dt) == not_dst:
+                return to_unicode(tzinfo.tzname(_dt))
+
         # there was no standard time in 2000!
         raise VObjectError(f"Unable to guess TZID for tzinfo {tzinfo!s}")
 
@@ -337,17 +317,14 @@ class RecurringComponent(Component):
     """
     A vCalendar component like VEVENT or VTODO which may recur.
 
-    Any recurring component can have one or multiple RRULE, RDATE,
-    EXRULE, or EXDATE lines, and one or zero DTSTART lines.  It can also have a
-    variety of children that don't have any recurrence information.
+    Any recurring component can have one or multiple RRULE, RDATE, EXRULE, or EXDATE lines, and one or zero DTSTART
+    lines. It can also have a variety of children that don't have any recurrence information.
 
-    In the example below, note that dtstart is included in the rruleset.
-    This is not the default behavior for dateutil's rrule implementation unless
-    dtstart would already have been a member of the recurrence rule, and as a
-    result, COUNT is wrong. This can be worked around when getting rruleset by
-    adjusting count down by one if an rrule has a count and dtstart isn't in its
-    result set, but by default, the rruleset property doesn't do this work
-    around, to access it getrruleset must be called with addRDate set True.
+    In the example below, note that dtstart is included in the rruleset. This is not the default behavior for
+    dateutil's rrule implementation unless dtstart would already have been a member of the recurrence rule,
+    and as a result, COUNT is wrong. This can be worked around when getting rruleset by adjusting count down by one
+    if an rrule has a count and dtstart isn't in its result set, but by default, the rruleset property doesn't do
+    this work around, to access it getrruleset must be called with addRDate set True.
 
     @property rruleset:
         A U{rruleset<https://moin.conectiva.com.br/DateUtil>}.
@@ -365,13 +342,12 @@ class RecurringComponent(Component):
         """
         Get an rruleset created from self.
 
-        If addRDate is True, add an RDATE for dtstart if it's not included in
-        an RRULE or RDATE, and count is decremented if it exists.
+        If addRDate is True, add an RDATE for dtstart if it's not included in an RRULE or RDATE, and count is
+        decremented if it exists.
 
-        Note that for rules which don't match DTSTART, DTSTART may not appear
-        in list(rruleset), although it should.  By default, an RDATE is not
-        created in these cases, and count isn't updated, so dateutil may list
-        a spurious occurrence.
+        Note that for rules which don't match DTSTART, DTSTART may not appear in list(rruleset), although it should.
+        By default, an RDATE is not created in these cases, and count isn't updated, so dateutil may list a spurious
+        occurrence.
         """
         rruleset = None
         for name in DATESANDRULES:
@@ -426,29 +402,22 @@ class RecurringComponent(Component):
                         vals = dict(pair.split("=") for pair in value.upper().split(";"))
                         if len(vals.get("UNTIL", "")) == 8:
                             until = dt.datetime.combine(until.date(), dtstart.time())
-                        # While RFC2445 says UNTIL MUST be UTC, Chandler allows
-                        # floating recurring events, and uses floating UNTIL
-                        # values. Also, some odd floating UNTIL but timezoned
-                        # DTSTART values have shown up in the wild, so put
-                        # floating UNTIL values DTSTART's timezone
+                        # While RFC2445 says UNTIL MUST be UTC, Chandler allows floating recurring events, and uses
+                        # floating UNTIL values. Also, some odd floating UNTIL but timezoned DTSTART values have
+                        # shown up in the wild, so put floating UNTIL values DTSTART's timezone
                         if until.tzinfo is None:
                             until = until.replace(tzinfo=dtstart.tzinfo)
 
                         if dtstart.tzinfo is not None:
                             until = until.astimezone(dtstart.tzinfo)
 
-                        # RFC2445 actually states that UNTIL must be a UTC
-                        # value. Whilst the changes above work OK, one problem
-                        # case is if DTSTART is floating but UNTIL is properly
-                        # specified as UTC (or with a TZID). In that case
-                        # dateutil will fail datetime comparisons. There is no
-                        # easy solution to this as there is no obvious timezone
-                        # (at this point) to do proper floating time offset
-                        # comparisons. The best we can do is treat the UNTIL
-                        # value as floating. This could mean incorrect
-                        # determination of the last instance. The better
-                        # solution here is to encourage clients to use COUNT
-                        # rather than UNTIL when DTSTART is floating.
+                        # RFC2445 actually states that UNTIL must be a UTC value. Whilst the changes above work OK,
+                        # one problem case is if DTSTART is floating but UNTIL is properly specified as UTC (or with
+                        # a TZID). In that case dateutil will fail datetime comparisons. There is no easy solution to
+                        # this as there is no obvious timezone (at this point) to do proper floating time offset
+                        # comparisons. The best we can do is treat the UNTIL value as floating. This could mean
+                        # incorrect determination of the last instance. The better solution here is to encourage
+                        # clients to use COUNT rather than UNTIL when DTSTART is floating.
                         if dtstart.tzinfo is None:
                             until = until.replace(tzinfo=None)
 
@@ -489,7 +458,7 @@ class RecurringComponent(Component):
 
     @rruleset.setter
     def rruleset(self, rruleset):
-        def _parse_values_from_rule() -> dict:
+        def _parse_values_from_rule(rule) -> dict:
             values_ = {}
 
             _value_map = {"BYYEARDAY": rule._byyearday, "BYWEEKNO": rule._byweekno, "BYSETPOS": rule._bysetpos}
@@ -511,8 +480,8 @@ class RecurringComponent(Component):
             if rule._byweekday is not None and (
                 rrule.WEEKLY != rule._freq or len(rule._byweekday) != 1 or rule._dtstart.weekday() != rule._byweekday[0]
             ):
-                # ignore byweekday if freq is WEEKLY and day correlates
-                # with dtstart because it was automatically set by dateutil
+                # ignore byweekday if freq is WEEKLY and day correlates with dtstart because
+                # it was automatically set by dateutil
                 days.extend(WEEKDAYS[n] for n in rule._byweekday)
 
             if rule._bynweekday is not None:
@@ -572,12 +541,11 @@ class RecurringComponent(Component):
                 if setlist:
                     self.add(name).value = setlist
             elif name in RULENAMES:
-                for rule in setlist:
+                for rule_item in setlist:
                     buf = get_buffer()
-                    buf.write("FREQ=")
-                    buf.write(FREQUENCIES[rule._freq])
+                    buf.write(f"FREQ={FREQUENCIES[rule_item._freq]}")
 
-                    values = _parse_values_from_rule()
+                    values = _parse_values_from_rule(rule_item)
 
                     for key, paramvals in values.items():
                         buf.write(f";{key}={','.join(paramvals)}")
@@ -589,8 +557,7 @@ class TextBehavior(Behavior):
     """
     Provide backslash escape encoding/decoding for single valued properties.
 
-    TextBehavior also deals with base64 encoding if the ENCODING parameter is
-    explicitly set to BASE64.
+    TextBehavior also deals with base64 encoding if the ENCODING parameter is explicitly set to BASE64.
     """
 
     base64string = "BASE64"  # vCard uses B
@@ -681,9 +648,8 @@ class DateTimeBehavior(Behavior):
         """
         Turn obj.value into a dt.
 
-        RFC2445 allows times without time zone information, "floating times"
-        in some properties.  Mostly, this isn't what you want, but when parsing
-        a file, real floating times are noted by setting to 'TRUE' the
+        RFC2445 allows times without time zone information, "floating times" in some properties. Mostly, this isn't
+        what you want, but when parsing a file, real floating times are noted by setting to 'TRUE' the
         X-VOBJ-FLOATINGTIME-ALLOWED parameter.
         """
         if obj.is_native:
@@ -768,8 +734,7 @@ class DateOrDateTimeBehavior(Behavior):
 
 class MultiDateBehavior(Behavior):
     """
-    Parent Behavior for ContentLines containing one or more DATE, DATE-TIME, or
-    PERIOD.
+    Parent Behavior for ContentLines containing one or more DATE, DATE-TIME, or PERIOD.
     """
 
     has_native = True
@@ -777,8 +742,7 @@ class MultiDateBehavior(Behavior):
     @staticmethod
     def transform_to_native(obj):
         """
-        Turn obj.value into a list of dates, datetimes, or
-        (datetime, timedelta) tuples.
+        Turn obj.value into a list of dates, datetimes, or (datetime, timedelta) tuples.
         """
         if obj.is_native:
             return obj
@@ -800,8 +764,7 @@ class MultiDateBehavior(Behavior):
     @staticmethod
     def transform_from_native(obj):
         """
-        Replace the date, datetime or period tuples in obj.value with
-        appropriate strings.
+        Replace the date, datetime or period tuples in obj.value with appropriate strings.
         """
         if obj.value and type(obj.value[0]) is dt.date:
             obj.is_native = False
@@ -883,8 +846,7 @@ class VCalendar2(VCalendarComponentBehavior):
         """
         Create PRODID, VERSION and VTIMEZONEs if needed.
 
-        VTIMEZONEs will need to exist whenever TZID parameters exist or when
-        datetimes with tzinfo exist.
+        VTIMEZONEs will need to exist whenever TZID parameters exist or when datetimes with tzinfo exist.
         """
         for comp in obj.components():
             if comp.behavior is not None:
@@ -927,11 +889,9 @@ class VCalendar2(VCalendarComponentBehavior):
         """
         Set implicit parameters, do encoding, return unicode string.
 
-        If validate is True, raise VObjectError if the line doesn't validate
-        after implicit parameters are generated.
+        If validate is True, raise VObjectError if the line doesn't validate after implicit parameters are generated.
 
         Default is to call base.default_serialize.
-
         """
 
         cls.generate_implicit_parameters(obj)
@@ -977,7 +937,7 @@ class VCalendar2(VCalendarComponentBehavior):
         return out
 
 
-VCalendar2_0 = VCalendar2  # alias
+VCalendar2_0 = VCalendar2  # alias #pylint:disable=invalid-name
 VCalendar2_0.name = "VCALENDAR"
 register_behavior(VCalendar2_0)
 
@@ -1032,11 +992,10 @@ class TZID(Behavior):
     """
     Don't use TextBehavior for TZID.
 
-    RFC2445 only allows TZID lines to be paramtext, so they shouldn't need any
-    encoding or decoding.  Unfortunately, some Microsoft products use commas
-    in TZIDs which should NOT be treated as a multi-valued text property, nor
-    do we want to escape them.  Leaving them alone works for Microsoft's breakage,
-    and doesn't affect compliant iCalendar streams.
+    RFC2445 only allows TZID lines to be paramtext, so they shouldn't need any encoding or decoding.  Unfortunately,
+    some Microsoft products use commas in TZIDs which should NOT be treated as a multi-valued text property,
+    nor do we want to escape them.  Leaving them alone works for Microsoft's breakage, and doesn't affect compliant
+    iCalendar streams.
     """
 
 
@@ -1053,9 +1012,7 @@ register_behavior(DaylightOrStandard, "DAYLIGHT")
 
 
 class VEvent(RecurringBehavior):
-    """
-    Event behavior.
-    """
+    """Event behavior."""
 
     name = "VEVENT"
     sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
@@ -1111,9 +1068,7 @@ register_behavior(VEvent)
 
 
 class VTodo(RecurringBehavior):
-    """
-    To-do behavior.
-    """
+    """To-do behavior."""
 
     name = "VTODO"
     description = 'A grouping of component properties and possibly "VALARM" \
@@ -1239,8 +1194,7 @@ class VAlarm(VCalendarComponentBehavior):
     """
 
     name = "VALARM"
-    description = "Alarms describe when and how to provide alerts about events \
-                   and to-dos."
+    description = "Alarms describe when and how to provide alerts about events and to-dos."
     known_children = {
         "ACTION": (1, 1, None),  # min, max, behavior_registry id
         "TRIGGER": (1, 1, None),
@@ -1430,9 +1384,8 @@ class Trigger(Behavior):
                 return Duration.transform_to_native(obj)
             except ParseError:
                 logger.warning(
-                    "TRIGGER not recognized as DURATION, trying "
-                    "DATE-TIME, because iCal sometimes exports "
-                    "DATE-TIMEs without setting VALUE=DATE-TIME"
+                    "TRIGGER not recognized as DURATION, trying DATE-TIME, because iCal sometimes exports DATE-TIMEs "
+                    "without setting VALUE=DATE-TIME"
                 )
                 try:
                     obj.is_native = False
@@ -1440,8 +1393,7 @@ class Trigger(Behavior):
                 except AllException as e:
                     raise ParseError("TRIGGER with no VALUE not recognized as DURATION or as DATE-TIME") from e
         elif value == "DATE-TIME":
-            # TRIGGERs with DATE-TIME values must be in UTC, we could validate
-            # that fact, for now we take it on faith.
+            # TRIGGERs with DATE-TIME values must be in UTC, we could validate that fact, for now we take it on faith.
             return DateTimeBehavior.transform_to_native(obj)
         else:
             raise ParseError("VALUE must be DURATION or DATE-TIME")
@@ -1461,9 +1413,7 @@ register_behavior(Trigger)
 
 
 class PeriodBehavior(Behavior):
-    """
-    A list of (date-time, timedelta) tuples.
-    """
+    """A list of (date-time, timedelta) tuples."""
 
     has_native = True
 
@@ -1514,8 +1464,8 @@ register_behavior(FreeBusy, "FREEBUSY")
 
 class RRule(Behavior):
     """
-    Dummy behavior to avoid having RRULEs being treated as text lines (and thus
-    having semi-colons inaccurately escaped).
+    Dummy behavior to avoid having RRULEs being treated as text lines
+    (and thus having semi-colons inaccurately escaped).
     """
 
 
@@ -1581,8 +1531,7 @@ def timedelta_to_string(delta):
 
 def time_to_string(date_or_date_time):
     """
-    Wraps date_to_string and datetime_to_string, returning the results
-    of either based on the type of the argument
+    Wraps date_to_string and datetime_to_string, returning the results of either based on the type of the argument
     """
     if hasattr(date_or_date_time, "hour"):
         return datetime_to_string(date_or_date_time)
@@ -1699,21 +1648,22 @@ def parse_dtstart(contentline, allow_signature_mismatch=False):
     """
     Convert a contentline's value into a date or date-time.
 
-    A variety of clients don't serialize dates with the appropriate VALUE
-    parameter, so rather than failing on these (technically invalid) lines,
-    if allow_signature_mismatch is True, try to parse both varieties.
+    A variety of clients don't serialize dates with the appropriate VALUE parameter, so rather than failing on these
+    (technically invalid) lines, if allow_signature_mismatch is True, try to parse both varieties.
     """
     tzinfo = get_tzid(getattr(contentline, "tzid_param", None))
     value_param = getattr(contentline, "value_param", "DATE-TIME").upper()
+    parsed_dtstart = None
     if value_param == "DATE":
-        return string_to_date(contentline.value)
+        parsed_dtstart = string_to_date(contentline.value)
     elif value_param == "DATE-TIME":
         try:
-            return string_to_date_time(contentline.value, tzinfo)
+            parsed_dtstart = string_to_date_time(contentline.value, tzinfo)
         except AllException:
             if not allow_signature_mismatch:
                 raise
-            return string_to_date(contentline.value)
+            parsed_dtstart = string_to_date(contentline.value)
+    return parsed_dtstart
 
 
 def string_to_period(s, tzinfo=None):
@@ -1753,12 +1703,12 @@ def get_transition(transition_to, year, tzinfo):
         days = range(1, 32)
         hours = range(24)
         if month_ is None:
-            for month_ in months:
-                yield dt.datetime(year_, month_, 1)
+            for _month in months:
+                yield dt.datetime(year_, _month, 1)
         elif day_ is None:
-            for day_ in days:
+            for _day in days:
                 with contextlib.suppress(ValueError):
-                    yield dt.datetime(year_, month_, day_)
+                    yield dt.datetime(year_, month_, _day)
         else:
             for hour in hours:
                 yield dt.datetime(year_, month_, day_, hour)
@@ -1787,10 +1737,8 @@ def get_transition(transition_to, year, tzinfo):
     day = first_transition(generate_dates(year, month), test).day
     uncorrected = first_transition(generate_dates(year, month, day), test)
     if transition_to == "standard":
-        # assuming tzinfo.dst returns a new offset for the first
-        # possible hour, we need to add one hour for the offset change
-        # and another hour because first_transition returns the hour
-        # before the transition
+        # assuming tzinfo.dst returns a new offset for the first possible hour, we need to add one hour for the
+        # offset change and another hour because first_transition returns the hour before the transition
         return uncorrected + dt.timedelta(hours=2)
     else:
         return uncorrected + dt.timedelta(hours=1)

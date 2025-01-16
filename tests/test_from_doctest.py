@@ -2,7 +2,7 @@ import datetime as dt
 from io import StringIO
 from unittest import TestCase, skip
 
-import dateutil.rrule as rrule
+from dateutil import rrule
 
 import vobject as vo
 

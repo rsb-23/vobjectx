@@ -11,9 +11,7 @@ def get_sort_key(component):
     def get_uid():
         return component.get_child_value("uid", "")
 
-    # it's not quite as simple as getUID, need to account for recurrenceID and
-    # sequence
-
+    # it's not quite as simple as getUID, need to account for recurrenceID and sequence
     def get_sequence():
         sequence = component.get_child_value("sequence", 0)
         return f"{int(sequence):05d}"
@@ -30,10 +28,7 @@ def sort_by_uid(components):
 
 
 def delete_extraneous(component, ignore_dtstamp=False):
-    """
-    Recursively walk the component's children, deleting extraneous details like
-    X-VOBJ-ORIGINAL-TZID.
-    """
+    """Recursively walk the component's children, deleting extraneous details like X-VOBJ-ORIGINAL-TZID."""
     for comp in component.components():
         delete_extraneous(comp, ignore_dtstamp)
     for line in component.lines():
@@ -45,16 +40,12 @@ def delete_extraneous(component, ignore_dtstamp=False):
 
 def diff(left, right):
     """
-    Take two VCALENDAR components, compare VEVENTs and VTODOs in them,
-    return a list of object pairs containing just UID and the bits
-    that didn't match, using None for objects that weren't present in one
-    version or the other.
+    Take two VCALENDAR components, compare VEVENTs and VTODOs in them, return a list of object pairs containing just
+    UID and the bits that didn't match, using None for objects that weren't present in one version or the other.
 
-    When there are multiple ContentLines in one VEVENT, for instance many
-    DESCRIPTION lines, such lines original order is assumed to be
-    meaningful.  Order is also preserved when comparing (the unlikely case
-    of) multiple parameters of the same type in a ContentLine
-
+    When there are multiple ContentLines in one VEVENT, for instance many DESCRIPTION lines, such lines original
+    order is assumed to be meaningful.  Order is also preserved when comparing (the unlikely case of) multiple
+    parameters of the same type in a ContentLine
     """
 
     def process_component_lists(left_list, right_list):
@@ -90,11 +81,7 @@ def diff(left, right):
         return output
 
     def process_component_pair(left_comp, right_comp):
-        """
-        Return None if a match, or a pair of components including UIDs and
-        any differing children.
-
-        """
+        """Return None if a match, or a pair of components including UIDs and any differing children."""
         left_child_keys = left_comp.contents.keys()
         right_child_keys = right_comp.contents.keys()
 
@@ -132,10 +119,8 @@ def diff(left, right):
         for name, child_pair_list in different_components.items():
             left_components, right_components = zip(*child_pair_list)
             if len(left_components) > 0:
-                # filter out None
                 _left.contents[name] = filter(None, left_components)
             if len(right_components) > 0:
-                # filter out None
                 _right.contents[name] = filter(None, right_components)
 
         for left_child_line, right_child_line in different_content_lines:
