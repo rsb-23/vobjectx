@@ -1,6 +1,7 @@
 # pylint: disable=c0302
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
+
 from __future__ import annotations
 
 import datetime as dt
@@ -22,7 +23,7 @@ from .parser import string_to_durations
 DATENAMES = ("rdate", "exdate")
 RULENAMES = ("exrule", "rrule")
 DATESANDRULES = ("exrule", "rrule", "rdate", "exdate")
-PRODID = "-//VOBJECTX//NONSGML Version %s//EN" % VERSION
+PRODID = f"-//VOBJECTX//NONSGML Version {VERSION}//EN"
 
 WEEKDAYS = "MO", "TU", "WE", "TH", "FR", "SA", "SU"
 FREQUENCIES = ("YEARLY", "MONTHLY", "WEEKLY", "DAILY", "HOURLY", "MINUTELY", "SECONDLY")
