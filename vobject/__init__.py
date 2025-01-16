@@ -66,7 +66,7 @@ VObject Overview
     >>> print(x.serialize())
     BEGIN:VCALENDAR
     VERSION:2.0
-    PRODID:-//PYVOBJECT//NONSGML Version 1//EN
+    PRODID:-//VOBJECTX//NONSGML Version 1//EN
     BEGIN:VEVENT
     UID:randomuid@MYHOSTNAME
     DTSTART:20041215T140000Z

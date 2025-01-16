@@ -6,7 +6,7 @@ import unittest
 import dateutil
 from dateutil.tz import tzutc
 
-from vobject import iCalendar
+from vobject import VERSION, iCalendar
 from vobject.base import ContentLine, ParseError
 from vobject.base import __behavior_registry as behavior_registry
 from vobject.base import (
@@ -35,7 +35,7 @@ class TestCalendarSerializing(unittest.TestCase):
         """
         CreateCalendar 2.0 format from scratch
         """
-        test_cal = get_test_file("simple_2_0_test.ics")
+        test_cal = get_test_file("simple_2_0_test.ics") % VERSION
         cal = new_from_behavior("vcalendar", "2.0")
         cal.add("vevent")
         cal.vevent.add("dtstart").value = dt.datetime(2006, 5, 9)
