@@ -243,7 +243,7 @@ class TestBehaviors(unittest.TestCase):
         non_component_behavior = get_behavior("RDATE")
         self.assertFalse(non_component_behavior.is_component)
 
-    def test_MultiDateBehavior(self):
+    def test_multi_date_behavior(self):
         """
         Test MultiDateBehavior
         """

@@ -85,10 +85,10 @@ VERSION = __version__
 
 
 # noinspection PyPep8Naming
-def iCalendar():
+def iCalendar():  # pylint:disable=invalid-name
     return new_from_behavior("vcalendar", "2.0")
 
 
 # noinspection PyPep8Naming
-def vCard():
+def vCard():  # pylint:disable=invalid-name
     return new_from_behavior("vcard", "3.0")

@@ -1,9 +1,9 @@
 """Translate an ics file's events to a different timezone."""
 
+import zoneinfo
 from argparse import ArgumentParser
 from datetime import datetime
 
-import pytz
 from dateutil import tz
 
 import vobject as vo
@@ -34,7 +34,7 @@ def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vo.icalendar.ut
 
 
 def show_timezones():
-    for tz_string in pytz.all_timezones:
+    for tz_string in zoneinfo.available_timezones():
         print(tz_string)
 
 
@@ -44,7 +44,8 @@ def convert_events(utc_only, args):
     _tzone = args[1] if len(args) > 1 else "UTC"
 
     print(f"... Reading {ics_file}")
-    cal = vo.read_one(open(ics_file))
+    with open(ics_file, "r") as f:
+        cal = vo.read_one(f)
     change_tz(cal, new_timezone=tz.gettz(_tzone), default=tz.gettz("UTC"), utc_only=utc_only)
 
     out_name = f"{ics_file}.converted"
