@@ -1,7 +1,9 @@
 import subprocess
 import unittest
+from dataclasses import dataclass
 
 
+@dataclass
 class Cli:
     ics_diff = "ics_diff"
     change_tz = "change_tz"

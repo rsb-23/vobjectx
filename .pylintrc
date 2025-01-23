@@ -30,4 +30,3 @@ disable=
     # Refactoring
     duplicate-code,
     no-else-return,
-    too-few-public-methods,
