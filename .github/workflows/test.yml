@@ -1,5 +1,5 @@
 name: unit-test
-on: [ pull_request ]
+on: [ push, pull_request ]
 jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: ubuntu-latest
@@ -15,6 +15,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
+          pip install -e .
           pip install coverage[toml]
 
       - name: Run tests with coverage and enforce minimum
@@ -27,7 +28,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
@@ -47,6 +48,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
+          pip install -e .
       - name: Run Tests
         run: |
           python -m unittest discover -f

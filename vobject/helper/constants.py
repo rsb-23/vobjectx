@@ -1,3 +1,7 @@
+from dataclasses import dataclass
+
+
+@dataclass
 class Character:
     """Space and Line-break characters"""
 

@@ -156,11 +156,9 @@ def pretty_diff(left_obj, right_obj):
         print(">" * seperator_size)
 
 
-def get_options():
-    # Configuration options #
-    usage = "usage: %prog [options] ics_file1 ics_file2"
-    parser = ArgumentParser(usage=usage, description="ics_diff will print a comparison of two iCalendar files ")
-    parser.add_argument("--version", action="version", version=vo.VERSION)
+def get_arguments():
+    parser = ArgumentParser(description="ics_diff will print a comparison of two iCalendar files ")
+    parser.add_argument("-V", "--version", action="version", version=vo.VERSION)
     parser.add_argument(
         "-i",
         "--ignore-dtstamp",
@@ -169,27 +167,20 @@ def get_options():
         default=False,
         help="ignore DTSTAMP lines [default: False]",
     )
+    parser.add_argument("ics_file1", help="The first ics file to compare")
+    parser.add_argument("ics_file2", help="The second ics file to compare")
 
-    (cmdline_options, args) = parser.parse_args()
-    if len(args) < 2:
-        print("error: too few arguments given\n")
-        print(parser.format_help())
-        return False, False
-
-    return cmdline_options, args
+    return parser.parse_args()
 
 
 def main():
-    options, args = get_options()
-    if args:
-        ignore_dtstamp = options.ignore
-        ics_file1, ics_file2 = args
-        with open(ics_file1) as f, open(ics_file2) as g:
-            cal1 = vo.read_one(f)
-            cal2 = vo.read_one(g)
-        delete_extraneous(cal1, ignore_dtstamp=ignore_dtstamp)
-        delete_extraneous(cal2, ignore_dtstamp=ignore_dtstamp)
-        pretty_diff(cal1, cal2)
+    args = get_arguments()
+    with open(args.ics_file1) as f, open(args.ics_file2) as g:
+        cal1 = vo.read_one(f)
+        cal2 = vo.read_one(g)
+    delete_extraneous(cal1, ignore_dtstamp=args.ignore)
+    delete_extraneous(cal2, ignore_dtstamp=args.ignore)
+    pretty_diff(cal1, cal2)
 
 
 if __name__ == "__main__":

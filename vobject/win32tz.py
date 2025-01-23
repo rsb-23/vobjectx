@@ -62,8 +62,7 @@ def pick_nth_weekday(year, month, dayofweek, hour, minute, whichweek):
 class Win32tzData:
     """Read a registry key for a timezone, expose its contents."""
 
-    # pylint: disable=r0902
-
+    # pylint: disable=r0902,r0903
     def __init__(self, path):
         """Load path, or if path is empty, load local time."""
         if path:
@@ -108,15 +107,3 @@ def values_to_dict(key):
     """Convert a registry key's values to a dictionary."""
     size = winreg.QueryInfoKey(key)[1]
     return {winreg.EnumValue(key, i)[0]: winreg.EnumValue(key, i)[1] for i in range(size)}
-
-
-def _test():
-    import doctest
-
-    import win32tz
-
-    doctest.testmod(win32tz, verbose=False)
-
-
-if __name__ == "__main__":
-    _test()
