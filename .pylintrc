@@ -24,7 +24,6 @@ disable=
     protected-access,
     unspecified-encoding,
     # Conventions
-    import-outside-toplevel,
     missing-docstring,
     unidiomatic-typecheck,
     # Refactoring
