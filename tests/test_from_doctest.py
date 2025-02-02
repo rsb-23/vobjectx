@@ -34,7 +34,7 @@ def test_vobject():
     v, utc = x.vevent, vo.icalendar.utc
     v.add("dtstart").value = dt.datetime(2004, 12, 15, 14, tzinfo=utc)
     assert str(v) == "<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>"
-    assert str(x) == "<VCALENDAR| [<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>]>"  # noqa: E501
+    assert str(x) == "<VCALENDAR| [<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>]>"
 
     newrule = rrule.rruleset()
     newrule.rrule(rrule.rrule(rrule.WEEKLY, count=2, dtstart=v.dtstart.value))

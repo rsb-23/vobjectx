@@ -49,8 +49,8 @@ def test_regexes():
 
 def test_string_to_text_values():
     """Test string lists"""
-    assert string_to_text_values(""), [""]
-    assert string_to_text_values("abcd,efgh"), ["abcd", "efgh"]
+    assert string_to_text_values("") == [""]
+    assert string_to_text_values("abcd,efgh") == ["abcd", "efgh"]
 
 
 def test_string_to_period():
@@ -98,7 +98,7 @@ def test_vtimezone_creation():
     for year in range(2001, 2010):
         for month in (2, 9):
             _dt = dt.datetime(year, month, 15, tzinfo=tzs.get("Santiago"))
-            assert _dt.replace(tzinfo=tzs.get("Santiago")), _dt
+            assert _dt.replace(tzinfo=tzs.get("Santiago")) == _dt
 
 
 def test_timezone_serializing():
@@ -170,13 +170,11 @@ def test_free_busy():
     vfb.add("freebusy").value = [(vfb.dtstart.value, two_hours / 2)]
     vfb.add("freebusy").value = [(vfb.dtstart.value, vfb.dtend.value)]
 
-    assert vfb.serialize().replace("\r\n", "\n"), test_cal.replace("\r\n", "\n")
+    assert vfb.serialize().replace("\r\n", "\n") == test_cal.replace("\r\n", "\n")
 
 
-def test_availablity():
-    """
-    Test availability components
-    """
+def test_availability():
+    """Test availability components"""
     test_cal = get_test_file("availablity.ics")
 
     vcal = base.new_from_behavior("VAVAILABILITY")
@@ -201,7 +199,7 @@ def test_availablity():
 
     vcal.add(av)
 
-    assert vcal.serialize().replace("\r\n", "\n"), test_cal.replace("\r\n", "\n")
+    assert vcal.serialize().replace("\r\n", "\n") == test_cal.replace("\r\n", "\n")
 
 
 def get_dates_of_first_component(arg0):
@@ -215,9 +213,9 @@ def test_recurrence():
     Ensure date valued UNTILs in rrules are in a reasonable timezone, and include that day (12/28 in this test)
     """
     dates = get_dates_of_first_component("recurrence.ics")
-    assert dates[0], dt.datetime(2006, 1, 26, 23, 0, tzinfo=tzutc())
-    assert dates[1], dt.datetime(2006, 2, 23, 23, 0, tzinfo=tzutc())
-    assert dates[-1], dt.datetime(2006, 12, 28, 23, 0, tzinfo=tzutc())
+    assert dates[0] == dt.datetime(2006, 1, 26, 23, 0, tzinfo=tzutc())
+    assert dates[1] == dt.datetime(2006, 2, 23, 23, 0, tzinfo=tzutc())
+    assert dates[-1] == dt.datetime(2006, 12, 28, 23, 0, tzinfo=tzutc())
 
 
 def test_recurring_component():
@@ -234,14 +232,14 @@ def test_recurring_component():
     # Now add start and rule for recurring event
     vevent.add("dtstart").value = dt.datetime(2005, 1, 19, 9)
     vevent.add("rrule").value = "FREQ=WEEKLY;COUNT=2;INTERVAL=2;BYDAY=TU,TH"
-    assert list(vevent.rruleset) == [dt.datetime(2005, 1, 20, 9, 0), dt.datetime(2005, 2, 1, 9, 0)]  # noqa
-    assert list(vevent.getrruleset(add_rdate=True)), [dt.datetime(2005, 1, 19, 9, 0) == dt.datetime(2005, 1, 20, 9, 0)]
+    assert list(vevent.rruleset) == [dt.datetime(2005, 1, 20, 9), dt.datetime(2005, 2, 1, 9)]
+    assert list(vevent.getrruleset(add_rdate=True)) == [dt.datetime(2005, 1, 19, 9), dt.datetime(2005, 1, 20, 9)]
 
     # Also note that dateutil will expand all-day events (dt.date values)
     # to dt.datetime value with time 0 and no timezone.
     vevent.dtstart.value = dt.date(2005, 3, 18)
-    assert list(vevent.rruleset), [dt.datetime(2005, 3, 29, 0, 0), dt.datetime(2005, 3, 31, 0, 0)]  # noqa
-    assert list(vevent.getrruleset(add_rdate=True)), [dt.datetime(2005, 3, 18, 0, 0) == dt.datetime(2005, 3, 29, 0, 0)]
+    assert list(vevent.rruleset) == [dt.datetime(2005, 3, 29), dt.datetime(2005, 3, 31)]
+    assert list(vevent.getrruleset(add_rdate=True)) == [dt.datetime(2005, 3, 18), dt.datetime(2005, 3, 29)]
 
 
 def _recurrence_test(file_name):
