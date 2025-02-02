@@ -189,10 +189,8 @@ class TestIcalendar(TestCase):
 
         self.assertEqual(vfb.serialize().replace("\r\n", "\n"), test_cal.replace("\r\n", "\n"))
 
-    def test_availablity(self):
-        """
-        Test availability components
-        """
+    def test_availability(self):
+        """Test availability components"""
         test_cal = get_test_file("availablity.ics")
 
         vcal = base.new_from_behavior("VAVAILABILITY")

@@ -52,6 +52,9 @@ path = "vobject/__about__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["vobject"]
 
+[tool.hatch.build]
+include = ["README.md", "LICENSE"]
+
 [tool.black]
 target-version = ["py39", "py310", "py311", "py312", "py313"]
 line-length = 120
@@ -67,6 +70,7 @@ per-file-ignores = ["*/__init__.py: F401", "*/imports_.py: F401"]
 profile = "black"
 line_length = 120
 multi_line_output = 3
+split_on_trailing_comma = false
 
 [tool.coverage.report]
 fail_under = 70.0

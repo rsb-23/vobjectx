@@ -7,3 +7,4 @@ Gustavo Niemeyer, for all his work on dateutil
 Dave Cridland, for helping talk about vobject and working on vcard
 TJ Gabbour, for putting his heart into parsing
 Sameen Karim and Will Percival, for maintaining the package at Eventable.
+David Arnold, for maintaining the package at py-vobject.
