@@ -9,6 +9,6 @@ vobject.egg-info/**/*
 .venv/
 venv/
 *.sublime-*
-.coverage
+*coverage*
 
 new/

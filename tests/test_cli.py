@@ -1,5 +1,4 @@
 import subprocess
-import unittest
 from dataclasses import dataclass
 
 
@@ -13,19 +12,23 @@ def run_cli_tool(toolname: str, args: list[str]):
     return subprocess.run([toolname] + args, capture_output=True, text=True, check=False)
 
 
-class TestCli(unittest.TestCase):
-    def test_change_tz(self):
-        result = run_cli_tool(Cli.change_tz, ["--version"])
-        self.assertEqual(result.returncode, 0)
+def test_change_tz():
+    # Test --version argument
+    result = run_cli_tool(Cli.change_tz, ["--version"])
+    assert result.returncode == 0
 
-        result = run_cli_tool(Cli.change_tz, [])
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("one of the arguments -l/--list ics_file is required", result.stderr)
+    # Test missing required arguments
+    result = run_cli_tool(Cli.change_tz, [])
+    assert result.returncode == 2
+    assert "one of the arguments -l/--list ics_file is required" in result.stderr
 
-    def test_ics_diff(self):
-        result = run_cli_tool(Cli.ics_diff, ["--version"])
-        self.assertEqual(result.returncode, 0)
 
-        result = run_cli_tool(Cli.ics_diff, [])
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("required: ics_file1, ics_file2", result.stderr)
+def test_ics_diff():
+    # Test --version argument
+    result = run_cli_tool(Cli.ics_diff, ["--version"])
+    assert result.returncode == 0
+
+    # Test missing required arguments
+    result = run_cli_tool(Cli.ics_diff, [])
+    assert result.returncode == 2
+    assert "required: ics_file1, ics_file2" in result.stderr

@@ -34,8 +34,8 @@ dependencies = ["python-dateutil >= 2.5.0; python_version < '3.10'",
     "python-dateutil >= 2.7.0; python_version >= '3.10'", "pytz>=2019.1", "tzdata; sys_platform == 'win32'"]
 requires-python = ">=3.9"
 [project.optional-dependencies]
-dev = ["pre-commit", "mypy", "pylint", "coverage", "pytest"]
-
+lint = ["pre-commit", "pylint"]
+test = ["pytest", "pytest-cov"]
 
 [project.scripts]
 ics_diff = "vobject.ics_diff:main"
@@ -68,9 +68,11 @@ profile = "black"
 line_length = 120
 multi_line_output = 3
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]  # Path to your test files
+
 [tool.coverage.report]
-fail_under = 70.0
+fail_under = 75.0
 [tool.coverage.run]
 source = ["vobject/"]
-omit = ["wrappers.py"]
-command_line = "-m unittest discover -s tests -t ."
+omit = ["tests/*", "wrappers.py"]
