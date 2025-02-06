@@ -28,7 +28,7 @@ Dev Setup
 -
 1. Install dependencies
    ```
-   pip install -e '.[dev]'
+   pip install -e '.[lint]'
    ```
 2. Enable pre-commit hook and run manually.
    ```
