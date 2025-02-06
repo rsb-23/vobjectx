@@ -248,7 +248,12 @@ class ContentLine(VBase):
                 _encoding = self.params["CHARSET"][0]
             else:
                 _encoding = "utf-8"
-            self.value = byte_decoder(self.value, "quoted-printable").decode(_encoding)
+
+            _value = byte_decoder(self.value, "quoted-printable")
+            try:
+                self.value = _value.decode(_encoding)
+            except UnicodeDecodeError:
+                self.value = _value.decode("latin-1")
 
     @classmethod
     def duplicate(cls, copyit):

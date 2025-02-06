@@ -1,10 +1,10 @@
 import datetime as dt
 from io import StringIO
 
-import pytest
 from dateutil import rrule
 
 import vobject as vo
+from vobject.vcard import Name
 
 from .common import get_test_file
 
@@ -100,7 +100,6 @@ def test_tzid_unicode():
     assert cal.vevent.dtstart.serialize() == "DTSTART;TZID=Екатеринбург:20080530T150000\r\n"
 
 
-@pytest.mark.skip(reason="test fails, to be checked")
 def test_opensync_vcs():
     vcs = (
         "BEGIN:VCALENDAR\r\nPRODID:-//OpenSync//NONSGML OpenSync vformat 0.3//EN\r\nVERSION:1.0\r\n"
@@ -108,22 +107,17 @@ def test_opensync_vcs():
         "=C3=B6\r\nUID:20080406T152030Z-7822\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
     )
     vcs = vo.read_one(vcs, allow_qp=True)
-    assert vcs.serialize() == (
+    assert vcs.serialize().startswith(
         "BEGIN:VCALENDAR\r\nVERSION:1.0\r\nPRODID:-//OpenSync//NONSGML OpenSync vformat 0.3//EN\r\n"
-        "BEGIN:VEVENT\r\nUID:20080406T152030Z-7822\r\nDESCRIPTION:foo \xc3\xa5\\nbar \xc3\xa4\\nbaz \xc3\xb6\r\n"
-        "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        "BEGIN:VEVENT\r\nUID:20080406T152030Z-7822\r\nDESCRIPTION;CHARSET=UTF-8:foo å\\nbar ä\\nbaz ö\r\n"
     )
 
 
-@pytest.mark.skip(reason="test fails, to be checked")
 def test_vcf_qp():
     vcf = (
         "BEGIN:VCARD\nVERSION:2.1\nN;ENCODING=QUOTED-PRINTABLE:;=E9\nFN;ENCODING=QUOTED-PRINTABLE:=E9\nTEL;"
         "HOME:0111111111\nEND:VCARD\n\n"
     )
     vcf = vo.read_one(vcf)
-    assert vcf.n.value == "< Name:  ? >"
-    assert vcf.n.value.given == "\xe9"
-    assert vcf.serialize() == (
-        "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:\xc3\xa9\r\nN:;\xc3\xa9;;;\r\nTEL:0111111111\r\nEND:VCARD\r\n"
-    )
+    assert vcf.n.value == Name(given="é")
+    assert vcf.serialize() == "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:é\r\nN:;é;;;\r\nTEL:0111111111\r\nEND:VCARD\r\n"

@@ -40,10 +40,10 @@ def split_by_size(text: str, byte_size: int) -> Generator:
     yield encoded[start:].decode()
 
 
-def byte_decoder(text: str | bytes, encoding="base64") -> str | bytes:
+def byte_decoder(text: str | bytes, encoding="base64") -> bytes:
     if type(text) is str:
         text = text.encode()
-    return codecs.decode(text, encoding)
+    return codecs.decode(text, encoding)  # noqa: ide FP
 
 
 def byte_encoder(text: str | bytes, encoding="base64") -> bytes:
