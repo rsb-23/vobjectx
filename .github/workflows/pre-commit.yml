@@ -1,7 +1,7 @@
 name: Code Lint
 on:
   pull_request:
-    types: [ opened, reopened ]
+    types: [ reopened ]
   push:
 
 jobs:
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5.1.1
         with:
           python-version: 3.9
-          cache: 'pip'
+          cache: pip
 
       - name: Install dependencies
         run: |
