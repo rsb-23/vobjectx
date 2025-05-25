@@ -4,7 +4,7 @@ from .helper.converter import to_vname
 
 class ContentDict(dict):
     def __setattr__(self, key, value):
-        if type(value) is list:
+        if isinstance(value, list):
             if key.endswith("_list"):
                 key = key[:-5]
         elif key.endswith("_list"):

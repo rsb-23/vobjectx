@@ -1,6 +1,5 @@
-# pylint: disable=c0302
+# pylint: disable=c0123,c0302
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
-
 
 from __future__ import annotations
 
@@ -158,7 +157,7 @@ class TimezoneComponent(Component):
             newyear = dt.datetime(year, 1, 1)
             for transition_to in "daylight", "standard":
                 transition = get_transition(transition_to, year, tzinfo)
-                oldrule = working[transition_to]
+                oldrule: dict | None = working[transition_to]
 
                 if transition == newyear:
                     # transition_to is in effect for the whole year
