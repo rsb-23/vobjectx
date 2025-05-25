@@ -24,7 +24,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.9
-          cache: pip
 
       - name: Install dependencies
         run: |
@@ -42,4 +41,4 @@ jobs:
           gh release create $TAG --generate-notes
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.12.4
