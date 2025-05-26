@@ -1,3 +1,4 @@
+# pylint: disable=c0123
 r"""
 hCalendar: A microformat for serializing iCalendar data
           (http://microformats.org/wiki/hcalendar)
@@ -50,6 +51,11 @@ class HCalendar(VCalendar2_0):
         def buffer_write(s):
             outbuf.write(f"{indent_str(level=level, tabwidth=tabwidth)}{s}{Character.CRLF}")
 
+        def buffer_write_event(event_child: str, tag="span", *, prefix=""):
+            _value = event.get_child_value(event_child)
+            if _value:
+                buffer_write(f'{prefix}<{tag} class="{event_child}">{_value}</{tag}>:')
+
         # not serializing optional vcalendar wrapper
 
         vevents = obj.vevent_list
@@ -64,9 +70,7 @@ class HCalendar(VCalendar2_0):
                 buffer_write(f'<a class="url" href="{url}">')
                 level += 1
             # SUMMARY
-            summary = event.get_child_value("summary")
-            if summary:
-                buffer_write(f'<span class="summary">{summary}</span>:')
+            buffer_write_event("summary", "span")
 
             # DTSTART
             dtstart = event.get_child_value("dtstart")
@@ -104,13 +108,8 @@ class HCalendar(VCalendar2_0):
                     )
 
             # LOCATION
-            location = event.get_child_value("location")
-            if location:
-                buffer_write(f'at <span class="location">{location}</span>')
-
-            description = event.get_child_value("description")
-            if description:
-                buffer_write(f'<div class="description">{description}</div>')
+            buffer_write_event("location", "span", prefix="at ")
+            buffer_write_event("description", "div")
 
             if url:
                 level -= 1

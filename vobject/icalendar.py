@@ -54,8 +54,26 @@ def get_tzid(tzid, smart=True):
 utc = tz.tzutc()
 register_tzid("UTC", utc)
 
-
 # -------------------- Helper subclasses ---------------------------------------
+_TRANSITIONS = "daylight", "standard"
+
+
+def _date_to_datetime(dt_obj: dt.datetime | dt.date):
+    if isinstance(dt_obj, dt.datetime):
+        return dt_obj
+    return dt.datetime.fromordinal(dt_obj.toordinal())
+
+
+def _from_last_week(dt_):
+    """
+    How many weeks from the end of the month dt is, starting from 1.
+    """
+    next_month = dt.datetime(dt_.year, dt_.month + 1, 1)
+    time_diff = next_month - dt_
+    days_gap = time_diff.days + bool(time_diff.seconds)
+    return math.ceil(days_gap / 7)
+
+
 # noinspection PyProtectedMember
 class TimezoneComponent(Component):
     """
@@ -137,15 +155,6 @@ class TimezoneComponent(Component):
         - tzinfo classes dst method always treats times that could be in either offset as being in the later regime
         """
 
-        def from_last_week(dt_):
-            """
-            How many weeks from the end of the month dt is, starting from 1.
-            """
-            next_month = dt.datetime(dt_.year, dt_.month + 1, 1)
-            time_diff = next_month - dt_
-            days_gap = time_diff.days + bool(time_diff.seconds)
-            return math.ceil(days_gap / 7)
-
         # lists of dictionaries defining rules which are no longer in effect
         completed = {"daylight": [], "standard": []}
 
@@ -155,7 +164,7 @@ class TimezoneComponent(Component):
         # rule may be based on nth week of the month or the nth from the last
         for year in range(start, end + 1):
             newyear = dt.datetime(year, 1, 1)
-            for transition_to in "daylight", "standard":
+            for transition_to in _TRANSITIONS:
                 transition = get_transition(transition_to, year, tzinfo)
                 oldrule: dict | None = working[transition_to]
 
@@ -201,6 +210,7 @@ class TimezoneComponent(Component):
                         old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
                         name = tzinfo.tzname(transition, is_dst=is_dst)
                         offset = tzinfo.utcoffset(transition, is_dst=is_dst)
+
                     rule = {
                         "end": None,  # None, or an integer year
                         "start": transition,  # the datetime of transition
@@ -209,7 +219,7 @@ class TimezoneComponent(Component):
                         "hour": transition.hour,
                         "name": name,
                         "plus": int((transition.day - 1) / 7 + 1),  # nth week of the month
-                        "minus": from_last_week(transition),  # nth from last week
+                        "minus": _from_last_week(transition),  # nth from last week
                         "offset": offset,
                         "offsetfrom": old_offset,
                     }
@@ -220,8 +230,9 @@ class TimezoneComponent(Component):
                         plus_match = rule["plus"] == oldrule["plus"]
                         minus_match = rule["minus"] == oldrule["minus"]
                         truth = plus_match or minus_match
-                        for key in "month", "weekday", "hour", "offset":
-                            truth = truth and rule[key] == oldrule[key]
+                        truth = truth and all(
+                            rule[key] == oldrule[key] for key in ("month", "weekday", "hour", "offset")
+                        )
                         if truth:
                             # the old rule is still true, limit to plus or minus
                             oldrule["plus"] = oldrule["plus"] if plus_match else None
@@ -232,9 +243,9 @@ class TimezoneComponent(Component):
                             completed[transition_to].append(oldrule)
                             working[transition_to] = rule
 
-        for transition_to in "daylight", "standard":
-            if working[transition_to] is not None:
-                completed[transition_to].append(working[transition_to])
+        for transition_to, rule in working.items():
+            if rule is not None:
+                completed[transition_to].append(rule)
 
         self.contents.tzid = []
         self.contents.daylight = []
@@ -243,8 +254,8 @@ class TimezoneComponent(Component):
         self.add("tzid").value = self.pick_tzid(tzinfo, True)
 
         # old = None # unused?
-        for transition_to in "daylight", "standard":
-            for rule in completed[transition_to]:
+        for transition_to, rules in completed.items():
+            for rule in rules:
                 comp = self.add(transition_to)
                 dtstart = comp.add("dtstart")
                 dtstart.value = rule["start"]
@@ -258,18 +269,15 @@ class TimezoneComponent(Component):
                 num = rule["plus"] or -1 * (rule["minus"] or 0)
                 day_string = f"BYDAY={num}{WEEKDAYS[rule['weekday']]}" if num else ""
 
-                if rule["end"] is None:
-                    end_string = ""
-                else:
-                    if rule["hour"] is None:
-                        # all year offset, with no rule
-                        end_date = dt.datetime(rule["end"], 1, 1)
-                    else:
-                        weekday = rrule.weekday(rule["weekday"], num)
+                end_string = ""
+                if rule["end"] is not None:
+                    # all year offset, with no rule
+                    end_date = dt.datetime(rule["end"], 1, 1)
+                    if rule["hour"] is not None:
                         du_rule = rrule.rrule(
                             rrule.YEARLY,
                             bymonth=rule["month"],
-                            byweekday=weekday,
+                            byweekday=rrule.weekday(rule["weekday"], num),
                             dtstart=dt.datetime(rule["end"], 1, 1, rule["hour"]),
                         )
                         end_date = du_rule[0]
@@ -355,22 +363,20 @@ class RecurringComponent(Component):
             addfunc = None
             for line in self.contents.get(name, ()):
                 # don't bother creating a rruleset unless there's a rule
-                if rruleset is None:
-                    rruleset = rrule.rruleset()
-                if addfunc is None:
-                    addfunc = getattr(rruleset, name)
+                rruleset = rruleset or rrule.rruleset()
+                addfunc = addfunc or getattr(rruleset, name)
 
                 try:
                     dtstart = self.dtstart.value
                 except (AttributeError, KeyError):
                     # Special for VTODO - try DUE property instead
+                    if self.name != "VTODO":
+                        # if there's no dtstart, just return None
+                        logger.error("failed to get dtstart with VTODO")
+                        return None
+
                     try:
-                        if self.name == "VTODO":
-                            dtstart = self.due.value
-                        else:
-                            # if there's no dtstart, just return None
-                            logger.error("failed to get dtstart with VTODO")
-                            return None
+                        dtstart = self.due.value
                     except (AttributeError, KeyError):
                         # if there's no due, just return None
                         logger.error("failed to find DUE at all.")
@@ -378,11 +384,8 @@ class RecurringComponent(Component):
 
                 if name in DATENAMES:
                     # ignoring RDATEs with PERIOD values for now
-                    if type(line.value[0]) is dt.datetime:
-                        list(map(addfunc, line.value))
-                    elif type(line.value[0]) is dt.date:
-                        for _dt in line.value:
-                            addfunc(dt.datetime(_dt.year, _dt.month, _dt.day))
+                    for _dt in line.value:
+                        addfunc(_date_to_datetime(_dt))
                 elif name in RULENAMES:
                     # a Ruby iCalendar library escapes semi-colons in rrules, so also remove any backslashes
                     value = line.value.replace("\\", "")
@@ -409,9 +412,6 @@ class RecurringComponent(Component):
                         if until.tzinfo is None:
                             until = until.replace(tzinfo=dtstart.tzinfo)
 
-                        if dtstart.tzinfo is not None:
-                            until = until.astimezone(dtstart.tzinfo)
-
                         # RFC2445 actually states that UNTIL must be a UTC value. Whilst the changes above work OK,
                         # one problem case is if DTSTART is floating but UNTIL is properly specified as UTC (or with
                         # a TZID). In that case dateutil will fail datetime comparisons. There is no easy solution to
@@ -419,8 +419,10 @@ class RecurringComponent(Component):
                         # comparisons. The best we can do is treat the UNTIL value as floating. This could mean
                         # incorrect determination of the last instance. The better solution here is to encourage
                         # clients to use COUNT rather than UNTIL when DTSTART is floating.
-                        if dtstart.tzinfo is None:
-                            until = until.replace(tzinfo=None)
+
+                        until = (
+                            until.replace(tzinfo=None) if dtstart.tzinfo is None else until.astimezone(dtstart.tzinfo)
+                        )
 
                     value_without_until = ";".join(
                         pair for pair in value.split(";") if pair.split("=")[0].upper() != "UNTIL"
@@ -433,14 +435,12 @@ class RecurringComponent(Component):
 
                 if name in ["rrule", "rdate"] and add_rdate:
                     # rlist = rruleset._rrule if name == 'rrule' else rruleset._rdate
-                    try:  # sourcery skip
-                        # dateutils does not work with all-day (dt.date) items so we need to convert to a
-                        # dt.datetime (which is what dateutils does internally)
-                        if not isinstance(dtstart, dt.datetime):
-                            adddtstart = dt.datetime.fromordinal(dtstart.toordinal())
-                        else:
-                            adddtstart = dtstart
 
+                    # dateutils does not work with all-day (dt.date) items so we need to convert to a
+                    # dt.datetime (which is what dateutils does internally)
+                    adddtstart = _date_to_datetime(dtstart)
+
+                    try:  # sourcery skip
                         if name == "rrule":
                             if rruleset._rrule[-1][0] != adddtstart:
                                 rruleset.rdate(adddtstart)
@@ -1714,7 +1714,7 @@ def get_transition(transition_to, year, tzinfo):
             for hour in hours:
                 yield dt.datetime(year_, month_, day_, hour)
 
-    assert transition_to in ("daylight", "standard")
+    assert transition_to in _TRANSITIONS
 
     def test(dt_):
         is_standard_transition = transition_to == "standard"
@@ -1762,9 +1762,13 @@ def tzinfo_eq(tzinfo1, tzinfo2, start_year=2000, end_year=2020):
     if not dt_test(dt.datetime(start_year, 1, 1)):
         return False
     for year in range(start_year, end_year):
-        for transition_to in "daylight", "standard":
+        for transition_to in _TRANSITIONS:
             t1 = get_transition(transition_to, year, tzinfo1)
             t2 = get_transition(transition_to, year, tzinfo2)
             if t1 != t2 or not dt_test(t1):
                 return False
     return True
+
+
+if __name__ == "__main__":
+    print(TimezoneComponent().tzinfo.locals())

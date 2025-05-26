@@ -6,8 +6,8 @@ ignore-paths=(?!(vobject|tests))/*
 max-line-length = 130
 
 [REFACTORING]
-max-branches = 30
-max-locals = 31
+max-branches = 20
+max-locals = 30
 max-statements = 77
 # keep
 max-args=8
