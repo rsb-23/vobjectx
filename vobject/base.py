@@ -285,10 +285,9 @@ class ContentLine(VBase):
         try:
             if name.endswith("_param"):
                 return self.params[to_vname(name, 6, True)][0]
-            elif name.endswith("_paramlist"):
+            if name.endswith("_paramlist"):
                 return self.params[to_vname(name, 10, True)]
-            else:
-                raise AttributeError(name)
+            raise AttributeError(name)
         except KeyError as e:
             raise AttributeError(name) from e
 
@@ -300,12 +299,12 @@ class ContentLine(VBase):
         which are legal in IANA tokens.
         """
         if name.endswith("_param"):
-            if type(value) is list:
+            if isinstance(value, list):
                 self.params[to_vname(name, 6, True)] = value
             else:
                 self.params[to_vname(name, 6, True)] = [value]
         elif name.endswith("_paramlist"):
-            if type(value) is list:
+            if isinstance(value, list):
                 self.params[to_vname(name, 10, True)] = value
             else:
                 raise VObjectError("Parameter list set to a non-list")
@@ -457,8 +456,7 @@ class Component(VBase):
         try:
             if name.endswith("_list"):
                 return self.contents[to_vname(name, 5)]
-            else:
-                return self.contents[to_vname(name)][0]
+            return self.contents[to_vname(name)][0]
         except KeyError as e:
             raise AttributeError(name) from e
 
@@ -683,48 +681,48 @@ def get_logical_lines(fp, allow_qp=True):
             if line:
                 yield line, line_number
             line_number += n
+        return
 
-    else:
-        quoted_printable = False
-        logical_line = get_buffer()
-        line_number = 0
-        line_start_number = 0
-        while True:
-            line = fp.readline()
-            if line == "":
-                break
-            line = line.rstrip(Char.CRLF)
-            line_number += 1
+    quoted_printable = False
+    logical_line = get_buffer()
+    line_number = 0
+    line_start_number = 0
+    while True:
+        line = fp.readline()
+        if line == "":
+            break
+        line = line.rstrip(Char.CRLF)
+        line_number += 1
 
-            if line.rstrip() == "":
-                if logical_line.tell() > 0:
-                    yield logical_line.getvalue(), line_start_number
-                line_start_number = line_number
-                logical_line = get_buffer()
-                quoted_printable = False
-                continue
-
-            if quoted_printable and allow_qp:
-                logical_line.write("\n")
-                quoted_printable = False
-            elif line[0] in Char.SPACEORTAB:
-                line = line[1:]
-            elif logical_line.tell() > 0:
+        if line.rstrip() == "":
+            if logical_line.tell() > 0:
                 yield logical_line.getvalue(), line_start_number
-                line_start_number = line_number
-                logical_line = get_buffer()
-            else:
-                logical_line = get_buffer()
-            logical_line.write(line)
+            line_start_number = line_number
+            logical_line = get_buffer()
+            quoted_printable = False
+            continue
 
-            # vCard 2.1 allows parameters to be encoded without a parameter name
-            # False positives are unlikely, but possible.
-            val = logical_line.getvalue()
-            if val[-1] == "=" and val.lower().find("quoted-printable") >= 0:
-                quoted_printable = True
-
-        if logical_line.tell() > 0:
+        if quoted_printable and allow_qp:
+            logical_line.write("\n")
+            quoted_printable = False
+        elif line[0] in Char.SPACEORTAB:
+            line = line[1:]
+        elif logical_line.tell() > 0:
             yield logical_line.getvalue(), line_start_number
+            line_start_number = line_number
+            logical_line = get_buffer()
+        else:
+            logical_line = get_buffer()
+        logical_line.write(line)
+
+        # vCard 2.1 allows parameters to be encoded without a parameter name
+        # False positives are unlikely, but possible.
+        val = logical_line.getvalue()
+        if val[-1] == "=" and val.lower().find("quoted-printable") >= 0:
+            quoted_printable = True
+
+    if logical_line.tell() > 0:
+        yield logical_line.getvalue(), line_start_number
 
 
 def text_line_to_content_line(text, n=None):

@@ -8,24 +8,16 @@ max-line-length = 130
 [REFACTORING]
 max-args=8
 max-attributes = 9
-max-branches = 30
-max-locals = 31
+max-branches = 20
+max-locals = 20
 max-positional-arguments = 8
-max-statements = 77
 
 [MESSAGES CONTROL]
 disable=
     I,
     import-error,
-    # Warnings
     fixme,
+    missing-docstring,
+    duplicate-code,
     keyword-arg-before-vararg,
     logging-fstring-interpolation,
-    protected-access,
-    unspecified-encoding,
-    # Conventions
-    missing-docstring,
-    unidiomatic-typecheck,
-    # Refactoring
-    duplicate-code,
-    no-else-return,

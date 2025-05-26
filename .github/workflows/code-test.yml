@@ -1,24 +1,25 @@
-name: unit-test
+name: Unit Tests
+permissions: { }
+
 on:
   pull_request:
     types: [ reopened ]
   push:
+
+env:
+  PY_BASE_VERSION: "3.9"
+
 jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: windows-latest
     steps:
-      - name: Code checkout
-        uses: actions/checkout@v4
-      - name: Setup Python 3.9
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.9'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install '.[test]'
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/test-setup
+        with:
+          python-version: ${{ env.PY_BASE_VERSION }}
 
       - name: Run tests with coverage and enforce minimum
         run: pytest -x --cov --cov-report=xml
@@ -31,37 +32,32 @@ jobs:
           path: coverage.xml
 
   macos-test: # Tests on macOS latest
+    needs: coverage-test
     runs-on: macos-latest
     steps:
-      - name: Code checkout
-        uses: actions/checkout@v4
-      - name: Setup Python 3.9
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.9'
-          cache: 'pip'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install '.[test]'
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/test-setup
+        with:
+          python-version: ${{ env.PY_BASE_VERSION }}
       - name: Run Tests
         run: pytest -x
 
   version-tests: # Tests code for higher version in ubuntu
+    needs: coverage-test
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: [ '3.10', '3.11', '3.12', '3.13' ]
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/test-setup
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      - name: Install Requirements
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install '.[test]'
       - name: Run Tests
         run: pytest -x

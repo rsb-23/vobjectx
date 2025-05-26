@@ -1,3 +1,4 @@
+# pylint: disable=c0123
 r"""
 hCalendar: A microformat for serializing iCalendar data
           (http://microformats.org/wiki/hcalendar)
@@ -28,11 +29,30 @@ and an equivalent event in hCalendar format with various elements optimized appr
 </span>
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from .base import register_behavior
 from .helper import Character, get_buffer, indent_str
 from .icalendar import VCalendar2_0
+
+
+class Event:
+    def __init__(self, event):
+        self.url = event.get_child_value("url")
+        self.summary = event.get_child_value("summary")
+        self.dtstart = event.get_child_value("dtstart")
+        self.dtend = event.get_child_value("dtend")
+        self.location = event.get_child_value("location")
+        self.duration = event.get_child_value("duration")
+        self.description = event.get_child_value("description")
+
+    @staticmethod
+    def machine_date(date_obj):
+        return date_obj.strftime("%Y%m%d" if type(date_obj) is date else "%Y%m%dT%H%M%S%z")
+
+    @staticmethod
+    def human_date(date_obj):
+        return date_obj.strftime("%A, %B %e" if type(date_obj) is date else "%A, %B %e, %H:%M")
 
 
 class HCalendar(VCalendar2_0):
@@ -50,76 +70,65 @@ class HCalendar(VCalendar2_0):
         def buffer_write(s):
             outbuf.write(f"{indent_str(level=level, tabwidth=tabwidth)}{s}{Character.CRLF}")
 
+        def buffer_write_event(event_child: str, value, *, tag="span", prefix=""):
+            if value:
+                buffer_write(f'{prefix}<{tag} class="{event_child}">{value}</{tag}>:')
+
         # not serializing optional vcalendar wrapper
 
         vevents = obj.vevent_list
 
         for event in vevents:
+            _event = Event(event)
             buffer_write('<span class="vevent">')
             level += 1
 
             # URL
-            url = event.get_child_value("url")
-            if url:
-                buffer_write(f'<a class="url" href="{url}">')
+            if _event.url:
+                buffer_write(f'<a class="url" href="{_event.url}">')
                 level += 1
             # SUMMARY
-            summary = event.get_child_value("summary")
-            if summary:
-                buffer_write(f'<span class="summary">{summary}</span>:')
+            buffer_write_event("summary", _event.summary, tag="span")
 
             # DTSTART
-            dtstart = event.get_child_value("dtstart")
-            if dtstart:
-                machine = timeformat = ""
-                if type(dtstart) is date:
-                    timeformat = "%A, %B %e"
-                    machine = "%Y%m%d"
-                elif type(dtstart) is datetime:
-                    timeformat = "%A, %B %e, %H:%M"
-                    machine = "%Y%m%dT%H%M%S%z"
-
+            if _event.dtstart:
                 # TODO: Handle non-datetime formats? Spec says we should handle when dtstart isn't included
 
                 buffer_write(
-                    f'<abbr class="dtstart", title="{dtstart.strftime(machine)}">{dtstart.strftime(timeformat)}</abbr>'
+                    f'<abbr class="dtstart", title="{_event.machine_date(_event.dtstart)}"'
+                    f">"
+                    f"{_event.human_date(_event.dtstart)}</abbr>"
                 )
 
                 # DTEND
-                dtend = event.get_child_value("dtend")
-                if not dtend:
-                    duration = event.get_child_value("duration")
-                    if duration:
-                        dtend = duration + dtstart
+                if not _event.dtend:
+                    if _event.duration:
+                        _event.dtend = _event.duration + _event.dtstart
                 # TODO: If lacking dtend & duration?
 
-                if dtend:
-                    human = dtend
+                if _event.dtend:
+                    human = _event.dtend
                     # TODO: Human readable part could be smarter, excluding repeated data
-                    if type(dtend) is date:
-                        human = dtend - timedelta(days=1)
+                    if type(_event.dtend) is date:
+                        human = _event.dtend - timedelta(days=1)
 
                     buffer_write(
-                        f'- <abbr class="dtend", title="{dtend.strftime(machine)}">{human.strftime(timeformat)}</abbr>'
+                        f'- <abbr class="dtend", title="{_event.machine_date(_event.dtend)}"'
+                        f">{_event.human_date(human)}</abbr>"
                     )
 
             # LOCATION
-            location = event.get_child_value("location")
-            if location:
-                buffer_write(f'at <span class="location">{location}</span>')
+            buffer_write_event("location", _event.location, tag="span", prefix="at ")
+            buffer_write_event("description", _event.description, tag="div")
 
-            description = event.get_child_value("description")
-            if description:
-                buffer_write(f'<div class="description">{description}</div>')
-
-            if url:
+            if _event.url:
                 level -= 1
                 buffer_write("</a>")
 
             level -= 1
             buffer_write("</span>")  # close vevent
 
-        return buf or outbuf.getvalue()
+        return outbuf.getvalue()
 
 
 register_behavior(HCalendar)
