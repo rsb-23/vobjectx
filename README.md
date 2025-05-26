@@ -1,11 +1,11 @@
 # VObjectx
 
-|                |                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Compatibility  | ![PyPI-PyVersion](https://img.shields.io/pypi/pyversions/vobjectx)                                                                                                                                                                                                                                                                                                                                                                           |
-| Quality Checks | [![pre--commit](https://github.com/rsb-23/vobjectx/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/rsb-23/vobjectx/actions/workflows/pre-commit.yml) [![unit tests](https://github.com/rsb-23/vobjectx/actions/workflows/test.yml/badge.svg)](https://github.com/rsb-23/vobjectx/actions/workflows/test.yml)   [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)] |
-| Package        | ![PyPI-Version](https://img.shields.io/pypi/v/vobjectx) ![PyPI-Downloads](https://img.shields.io/pypi/dm/vobjectx?label=PyPI%20downloads)                                                                                                                                                                                                                                                                                                    |
-| MetaData       | [![License](https://img.shields.io/badge/License-Apache_2.0-orange.svg)](https://github.com/rsb-23/vobjectx/blob/main/LICENSE)                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                                           
+|                |                                                                                             |
+|----------------|---------------------------------------------------------------------------------------------|
+| Compatibility  | ![Py-Version]                                                                               |
+| Quality Checks | [![lint check][lint-badge]]() [![tests][tests-badge]]() [![pre-commit][pre-commit-badge]]() |
+| Package        | ![pypi-v] ![pypi-downloads]                                                                 |
+| MetaData       | [![license-badge]][license]                                                                 |                                                                                                                                                                                           
 
 VObjectx is intended to be a full-featured Python3 package for parsing and
 generating vCard and vCalendar files.
@@ -19,6 +19,15 @@ generating vCard and vCalendar files.
 - It is a practice project to learn about different areas of python package creation and maintainenece.
 
 ---
-Made with :heart:
+Made with 💚
 
 [pyvobject]: https://www.github.com/py-vobject/vobject
+
+[lint-badge]: https://github.com/rsb-23/vobjectx/actions/workflows/code-lint.yml/badge.svg
+[tests-badge]: https://github.com/rsb-23/vobjectx/actions/workflows/code-test.yml/badge.svg
+[license]: https://github.com/rsb-23/vobjectx/blob/main/LICENSE
+[license-badge]: https://img.shields.io/badge/License-Apache_2.0-orange.svg
+[pre-commit-badge]: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white
+[pypi-downloads]: https://img.shields.io/pypi/dm/vobjectx?label=Downloads
+[pypi-v]: https://img.shields.io/pypi/v/vobjectx?label=latest
+[py-version]: https://img.shields.io/pypi/pyversions/vobjectx

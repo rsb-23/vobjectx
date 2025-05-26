@@ -1,4 +1,6 @@
 name: Code Lint
+permissions: { }
+
 on:
   pull_request:
     types: [ reopened ]
@@ -9,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5.1.1
         with:
           python-version: 3.9
