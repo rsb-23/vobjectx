@@ -2,6 +2,8 @@
 Compares VTODOs and VEVENTs in two iCalendar sources.
 """
 
+from __future__ import annotations
+
 from argparse import ArgumentParser
 from dataclasses import dataclass
 

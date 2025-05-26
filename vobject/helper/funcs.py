@@ -49,4 +49,4 @@ def byte_decoder(text: str | bytes, encoding="base64") -> bytes:
 def byte_encoder(text: str | bytes, encoding="base64") -> bytes:
     if isinstance(text, str):
         text = text.encode()
-    return codecs.encode(text, encoding)
+    return codecs.encode(text, encoding)  # noqa
