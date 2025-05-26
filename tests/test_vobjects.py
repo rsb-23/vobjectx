@@ -2,9 +2,9 @@ import datetime as dt
 
 import pytest
 
-from vobject import read_one
-from vobject.base import get_behavior, new_from_behavior, parse_line, read_components
-from vobject.exceptions import ParseError
+from vobjectx import read_one
+from vobjectx.base import get_behavior, new_from_behavior, parse_line, read_components
+from vobjectx.exceptions import ParseError
 
 from .common import get_test_file
 

@@ -1,9 +1,9 @@
 import datetime as dt
 
-from vobject.base import ContentLine
-from vobject.base import __behavior_registry as behavior_registry
-from vobject.base import get_behavior, text_line_to_content_line
-from vobject.icalendar import MultiDateBehavior, PeriodBehavior
+from vobjectx.base import ContentLine
+from vobjectx.base import __behavior_registry as behavior_registry
+from vobjectx.base import get_behavior, text_line_to_content_line
+from vobjectx.icalendar import MultiDateBehavior, PeriodBehavior
 
 from .common import two_hours
 
@@ -24,7 +24,7 @@ def test_general_behavior():
 
     # test get_behavior
     behavior = get_behavior("VCALENDAR")
-    assert str(behavior) == "<class 'vobject.icalendar.VCalendar2'>"
+    assert str(behavior) == "<class 'vobjectx.icalendar.VCalendar2'>"
     assert behavior.is_component
     assert get_behavior("invalid_name") is None
 

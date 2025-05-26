@@ -7,8 +7,8 @@ import pytz
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
 from dateutil.tz import tzutc
 
-from vobject import base
-from vobject.icalendar import (
+from vobjectx import base
+from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
     VCalendar2_0,

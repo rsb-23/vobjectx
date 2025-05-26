@@ -1,6 +1,6 @@
 import pytest
 
-from vobject.base import read_components
+from vobjectx.base import read_components
 
 from .common import get_test_file
 

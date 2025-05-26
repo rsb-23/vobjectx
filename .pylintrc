@@ -1,6 +1,6 @@
 [MASTER]
 jobs=2
-ignore-paths=(?!(vobject|tests))/*
+ignore-paths=(?!(vobjectx|tests))/*
 
 [FORMAT]
 max-line-length = 130

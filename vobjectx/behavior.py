@@ -7,7 +7,7 @@ class Behavior:
     """
     Behavior (validation, encoding, and transformations) for vobjects.
 
-    Abstract class to describe vobject options, requirements and encodings.
+    Abstract class to describe vobjectx options, requirements and encodings.
 
     Behaviors are used for root components like VCALENDAR, for subcomponents
     like VEVENT, and for individual lines in components.

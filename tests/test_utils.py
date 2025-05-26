@@ -3,10 +3,10 @@ from io import StringIO
 
 from dateutil.tz import tzutc
 
-from vobject.base import fold_one_line
-from vobject.helper import indent_str
-from vobject.icalendar import date_to_string, datetime_to_string
-from vobject.vcard import to_list
+from vobjectx.base import fold_one_line
+from vobjectx.helper import indent_str
+from vobjectx.icalendar import date_to_string, datetime_to_string
+from vobjectx.vcard import to_list
 
 
 def test_to_list():

@@ -4,7 +4,7 @@ import sys
 import pytest
 
 if sys.platform == "win32":
-    from vobject.win32tz import Win32tz
+    from vobjectx.win32tz import Win32tz
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="This is a windows-specific module")

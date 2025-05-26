@@ -4,7 +4,7 @@ import json
 import dateutil
 from dateutil.tz import tzutc
 
-from vobject import VERSION, iCalendar, new_from_behavior, read_one
+from vobjectx import VERSION, iCalendar, new_from_behavior, read_one
 
 from .common import TEST_FILE_DIR, get_test_file
 
@@ -95,7 +95,7 @@ def test_ical_to_hcal():
     cal = new_from_behavior('hcalendar')
     self.assertEqual(
         str(cal.behavior),
-        "<class 'vobject.hcalendar.HCalendar'>"
+        "<class 'vobjectx.hcalendar.HCalendar'>"
     )
     cal.add('vevent')
     cal.vevent.add('summary').value = "this is a note"

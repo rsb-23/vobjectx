@@ -1,7 +1,7 @@
 """
-VObject Overview
+VObjectx Overview
 ================
-    vobject parses vCard or vCalendar files, returning a tree of Python objects.
+    vobjectx parses vCard or vCalendar files, returning a tree of Python objects.
     It also provids an API to create vCard or vCalendar data structures which
     can then be serialized.
 
@@ -9,7 +9,7 @@ VObject Overview
     ------------------------
     Streams containing one or many L{Component<base.Component>}s can be
     parsed using L{read_components<base.read_components>}.  As each Component
-    is parsed, vobject will attempt to give it a L{Behavior<behavior.Behavior>}.
+    is parsed, vobjectx will attempt to give it a L{Behavior<behavior.Behavior>}.
     If an appropriate Behavior is found, any base64, quoted-printable, or
     backslash escaped data will automatically be decoded.  Dates and datetimes
     will be transformed to datetime.date or datetime.datetime instances.

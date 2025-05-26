@@ -4,7 +4,7 @@
 .DS_Store
 build/**/*
 dist/**/*
-vobject.egg-info/**/*
+vobjectx.egg-info/**/*
 .idea/
 .venv/
 venv/
