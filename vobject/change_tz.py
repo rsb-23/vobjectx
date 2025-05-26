@@ -42,7 +42,7 @@ def convert_events(utc_only, ics_file, timezone_="UTC"):
     print(f'Converting {"only UTC" if utc_only else "all"} events')
 
     print(f"... Reading {ics_file}")
-    with open(ics_file, "r") as f:
+    with open(ics_file, "r") as f:  # pylint:disable=w1514
         cal = vo.read_one(f)
     change_tz(cal, new_timezone=tz.gettz(timezone_), default=tz.gettz("UTC"), utc_only=utc_only)
 

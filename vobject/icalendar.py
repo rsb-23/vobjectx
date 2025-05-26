@@ -1,4 +1,4 @@
-# pylint: disable=c0123,c0302
+# pylint: disable=c0123,c0302,w0212, r0915
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
 from __future__ import annotations
@@ -141,6 +141,7 @@ class TimezoneComponent(Component):
 
     @tzinfo.setter
     def tzinfo(self, tzinfo, start=2000, end=2030):
+        # pylint: disable=r0914
         """
         Create appropriate objects in self to represent tzinfo.
 
@@ -159,14 +160,14 @@ class TimezoneComponent(Component):
         completed = {"daylight": [], "standard": []}
 
         # dictionary defining rules which are currently in effect
-        working = {"daylight": None, "standard": None}
+        working: dict[str, dict | None] = {"daylight": None, "standard": None}
 
         # rule may be based on nth week of the month or the nth from the last
         for year in range(start, end + 1):
             newyear = dt.datetime(year, 1, 1)
             for transition_to in _TRANSITIONS:
                 transition = get_transition(transition_to, year, tzinfo)
-                oldrule: dict | None = working[transition_to]
+                oldrule = working[transition_to]
 
                 if transition == newyear:
                     # transition_to is in effect for the whole year
@@ -460,9 +461,8 @@ class RecurringComponent(Component):
     @rruleset.setter
     def rruleset(self, rruleset):
         def _parse_values_from_rule(rule) -> dict:
-            values_ = {}
-
             _value_map = {"BYYEARDAY": rule._byyearday, "BYWEEKNO": rule._byweekno, "BYSETPOS": rule._bysetpos}
+            values_ = {}
             for k, v in _value_map.items():
                 if v is not None:
                     values_[k] = [str(n) for n in v]
@@ -516,18 +516,15 @@ class RecurringComponent(Component):
         try:
             dtstart = self.dtstart.value
         except (AttributeError, KeyError):
-            if self.name == "VTODO":
-                dtstart = self.due.value
-            else:
+            if self.name != "VTODO":
                 raise
+            dtstart = self.due.value
 
         is_date = type(dtstart) is dt.date
-        if is_date:
-            dtstart = dt.datetime(dtstart.year, dtstart.month, dtstart.day)
-            until_serialize = date_to_string
-        else:
-            # make sure to convert time zones to UTC
-            until_serialize = partial(datetime_to_string, convert_to_utc=True)
+
+        dtstart = _date_to_datetime(dtstart)
+        # make sure to convert time zones to UTC
+        until_serialize = date_to_string if is_date else partial(datetime_to_string, convert_to_utc=True)
 
         for name in DATESANDRULES:
             if name in self.contents:
@@ -547,7 +544,6 @@ class RecurringComponent(Component):
                     buf.write(f"FREQ={FREQUENCIES[rule_item._freq]}")
 
                     values = _parse_values_from_rule(rule_item)
-
                     for key, paramvals in values.items():
                         buf.write(f";{key}={','.join(paramvals)}")
 
@@ -1339,8 +1335,8 @@ class Duration(Behavior):
         if len(deltalist) == 1:
             obj.value = deltalist[0]
             return obj
-        else:
-            raise ParseError("DURATION must have a single duration string.")
+
+        raise ParseError("DURATION must have a single duration string.")
 
     @staticmethod
     def transform_from_native(obj):
@@ -1380,7 +1376,7 @@ class Trigger(Behavior):
         if obj.value == "":
             obj.is_native = True
             return obj
-        elif value == "DURATION":
+        if value == "DURATION":
             try:
                 return Duration.transform_to_native(obj)
             except ParseError:
@@ -1404,10 +1400,10 @@ class Trigger(Behavior):
         if type(obj.value) is dt.datetime:
             obj.value_param = "DATE-TIME"
             return UTCDateTimeBehavior.transform_from_native(obj)
-        elif type(obj.value) is dt.timedelta:
+        if type(obj.value) is dt.timedelta:
             return Duration.transform_from_native(obj)
-        else:
-            raise NativeError("Native TRIGGER values must be timedelta or datetime")
+
+        raise NativeError("Native TRIGGER values must be timedelta or datetime")
 
 
 register_behavior(Trigger)
@@ -1730,7 +1726,7 @@ def get_transition(transition_to, year, tzinfo):
     month_dt = first_transition(generate_dates(year), test)
     if month_dt is None:
         return dt.datetime(year, 1, 1)  # new year
-    elif month_dt.month == 12:
+    if month_dt.month == 12:
         return None
 
     # there was a good transition somewhere in a non-December month
@@ -1741,8 +1737,8 @@ def get_transition(transition_to, year, tzinfo):
         # assuming tzinfo.dst returns a new offset for the first possible hour, we need to add one hour for the
         # offset change and another hour because first_transition returns the hour before the transition
         return uncorrected + dt.timedelta(hours=2)
-    else:
-        return uncorrected + dt.timedelta(hours=1)
+
+    return uncorrected + dt.timedelta(hours=1)
 
 
 def tzinfo_eq(tzinfo1, tzinfo2, start_year=2000, end_year=2020):

@@ -3,8 +3,10 @@ Compares VTODOs and VEVENTs in two iCalendar sources.
 """
 
 from argparse import ArgumentParser
+from dataclasses import dataclass
 
 import vobject as vo
+from vobject.base import Component, ContentLine
 
 
 def get_sort_key(component):
@@ -38,6 +40,95 @@ def delete_extraneous(component, ignore_dtstamp=False):
         del component.dtstamp_list
 
 
+@dataclass
+class ObjectWithSides:
+    left: Component | ContentLine
+    right: Component | ContentLine
+
+
+def _process_component_lists(left_list, right_list):
+    output = []
+    right_index, right_list_size = 0, len(right_list)
+
+    for comp in left_list:
+        if right_index >= right_list_size:
+            output.append((comp, None))
+            continue
+
+        left_key = get_sort_key(comp)
+        right_comp = right_list[right_index]
+        right_key = get_sort_key(right_comp)
+        while left_key > right_key:
+            output.append((None, right_comp))
+            right_index += 1
+            if right_index >= right_list_size:
+                output.append((comp, None))
+                break
+
+            right_comp = right_list[right_index]
+            right_key = get_sort_key(right_comp)
+
+        if left_key < right_key:
+            output.append((comp, None))
+        elif left_key == right_key:
+            right_index += 1
+            match_result = _process_component_pair(comp, right_comp)
+            if match_result is not None:
+                output.append(match_result)
+
+    return output
+
+
+def _process_component_pair(left_comp, right_comp):
+    """Return None if a match, or a pair of components including UIDs and any differing children."""
+    child_keys = ObjectWithSides(left=left_comp.contents, right=right_comp.contents)
+
+    different_content_lines, different_components = [], {}
+
+    for key, left_list in child_keys.left.items():
+        right_list = right_comp.contents.get(key, [])
+        if isinstance(left_list[0], vo.base.Component):
+            comp_difference = _process_component_lists(left_list, right_list)
+            if len(comp_difference) > 0:
+                different_components[key] = comp_difference
+
+        elif left_list != right_list:
+            different_content_lines.append((left_list, right_list))
+
+    for key, right_list in child_keys.right.items():
+        if key not in child_keys.left:
+            if isinstance(right_list[0], vo.base.Component):
+                different_components[key] = ([], right_list)
+            else:
+                different_content_lines.append(([], right_list))
+
+    if not different_content_lines and not different_components:
+        return None
+
+    _component = ObjectWithSides(left=vo.new_from_behavior(left_comp.name), right=vo.new_from_behavior(left_comp.name))
+    # add a UID, if one existed, despite the fact that they'll always be the same
+    uid = left_comp.get_child_value("uid")
+    if uid is not None:
+        _component.left.add("uid").value = uid
+        _component.right.add("uid").value = uid
+
+    for name, child_pair_list in different_components.items():
+        left_components, right_components = zip(*child_pair_list)
+        if len(left_components) > 0:
+            _component.left.contents[name] = filter(None, left_components)
+        if len(right_components) > 0:
+            _component.right.contents[name] = filter(None, right_components)
+
+    for left_child_line, right_child_line in different_content_lines:
+        name = (left_child_line or right_child_line)[0].name
+        if left_child_line is not None:
+            _component.left.contents[name] = left_child_line
+        if right_child_line is not None:
+            _component.right.contents[name] = right_child_line
+
+    return _component.left, _component.right
+
+
 def diff(left, right):
     """
     Take two VCALENDAR components, compare VEVENTs and VTODOs in them, return a list of object pairs containing just
@@ -48,96 +139,11 @@ def diff(left, right):
     parameters of the same type in a ContentLine
     """
 
-    def process_component_lists(left_list, right_list):
-        output = []
-        right_index = 0
-        right_list_size = len(right_list)
-
-        for comp in left_list:
-            if right_index >= right_list_size:
-                output.append((comp, None))
-            else:
-                left_key = get_sort_key(comp)
-                right_comp = right_list[right_index]
-                right_key = get_sort_key(right_comp)
-                while left_key > right_key:
-                    output.append((None, right_comp))
-                    right_index += 1
-                    if right_index >= right_list_size:
-                        output.append((comp, None))
-                        break
-
-                    right_comp = right_list[right_index]
-                    right_key = get_sort_key(right_comp)
-
-                if left_key < right_key:
-                    output.append((comp, None))
-                elif left_key == right_key:
-                    right_index += 1
-                    match_result = process_component_pair(comp, right_comp)
-                    if match_result is not None:
-                        output.append(match_result)
-
-        return output
-
-    def process_component_pair(left_comp, right_comp):
-        """Return None if a match, or a pair of components including UIDs and any differing children."""
-        left_child_keys = left_comp.contents.keys()
-        right_child_keys = right_comp.contents.keys()
-
-        different_content_lines = []
-        different_components = {}
-
-        for key in left_child_keys:
-            right_list = right_comp.contents.get(key, [])
-            if isinstance(left_comp.contents[key][0], vo.base.Component):
-                comp_difference = process_component_lists(left_comp.contents[key], right_list)
-                if len(comp_difference) > 0:
-                    different_components[key] = comp_difference
-
-            elif left_comp.contents[key] != right_list:
-                different_content_lines.append((left_comp.contents[key], right_list))
-
-        for key in right_child_keys:
-            if key not in left_child_keys:
-                if isinstance(right_comp.contents[key][0], vo.base.Component):
-                    different_components[key] = ([], right_comp.contents[key])
-                else:
-                    different_content_lines.append(([], right_comp.contents[key]))
-
-        if not different_content_lines and not different_components:
-            return None
-
-        _left = vo.new_from_behavior(left_comp.name)
-        _right = vo.new_from_behavior(left_comp.name)
-        # add a UID, if one existed, despite the fact that they'll always be the same
-        uid = left_comp.get_child_value("uid")
-        if uid is not None:
-            _left.add("uid").value = uid
-            _right.add("uid").value = uid
-
-        for name, child_pair_list in different_components.items():
-            left_components, right_components = zip(*child_pair_list)
-            if len(left_components) > 0:
-                _left.contents[name] = filter(None, left_components)
-            if len(right_components) > 0:
-                _right.contents[name] = filter(None, right_components)
-
-        for left_child_line, right_child_line in different_content_lines:
-            non_empty = left_child_line or right_child_line
-            name = non_empty[0].name
-            if left_child_line is not None:
-                _left.contents[name] = left_child_line
-            if right_child_line is not None:
-                _right.contents[name] = right_child_line
-
-        return _left, _right
-
-    vevents = process_component_lists(
+    vevents = _process_component_lists(
         sort_by_uid(getattr(left, "vevent_list", [])), sort_by_uid(getattr(right, "vevent_list", []))
     )
 
-    vtodos = process_component_lists(
+    vtodos = _process_component_lists(
         sort_by_uid(getattr(left, "vtodo_list", [])), sort_by_uid(getattr(right, "vtodo_list", []))
     )
 
@@ -175,7 +181,7 @@ def get_arguments():
 
 def main():
     args = get_arguments()
-    with open(args.ics_file1) as f, open(args.ics_file2) as g:
+    with open(args.ics_file1) as f, open(args.ics_file2) as g:  # pylint:disable=w1514
         cal1 = vo.read_one(f)
         cal2 = vo.read_one(g)
     delete_extraneous(cal1, ignore_dtstamp=args.ignore)

@@ -285,10 +285,9 @@ class ContentLine(VBase):
         try:
             if name.endswith("_param"):
                 return self.params[to_vname(name, 6, True)][0]
-            elif name.endswith("_paramlist"):
+            if name.endswith("_paramlist"):
                 return self.params[to_vname(name, 10, True)]
-            else:
-                raise AttributeError(name)
+            raise AttributeError(name)
         except KeyError as e:
             raise AttributeError(name) from e
 
@@ -457,8 +456,7 @@ class Component(VBase):
         try:
             if name.endswith("_list"):
                 return self.contents[to_vname(name, 5)]
-            else:
-                return self.contents[to_vname(name)][0]
+            return self.contents[to_vname(name)][0]
         except KeyError as e:
             raise AttributeError(name) from e
 

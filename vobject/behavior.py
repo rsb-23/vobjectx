@@ -79,7 +79,7 @@ class Behavior:
             raise VObjectError(f"{obj} has a group, but this object doesn't support groups")
         if isinstance(obj, ContentLine):
             return cls.line_validate(obj, raise_exception, complain_unrecognized)
-        elif isinstance(obj, Component):
+        if isinstance(obj, Component):
             count = {}
             for child in obj.get_children():
                 if not child.validate(raise_exception, complain_unrecognized):
@@ -98,8 +98,7 @@ class Behavior:
                         raise ValidateError(m.format(cls.name, val[1], key))
                     return False
             return True
-        else:
-            raise VObjectError(f"{obj} is not a Component or Contentline")
+        raise VObjectError(f"{obj} is not a Component or Contentline")
 
     @classmethod
     def line_validate(cls, line, raise_exception, complain_unrecognized):
