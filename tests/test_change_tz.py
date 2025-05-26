@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from dateutil.tz import gettz
 
-from vobject.change_tz import change_tz
+from vobjectx.change_tz import change_tz
 
 
 @dataclass

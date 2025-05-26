@@ -5,8 +5,8 @@ import datetime as dt
 import pytest
 from dateutil.tz import tzutc
 
-from vobject import read_components, read_one
-from vobject.base import ParseError, parse_params
+from vobjectx import read_components, read_one
+from vobjectx.base import ParseError, parse_params
 
 from .common import get_test_file
 

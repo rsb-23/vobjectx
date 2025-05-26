@@ -1,4 +1,4 @@
-"""vobject module for reading vCard and vCalendar files."""
+"""vobjectx module for reading vCard and vCalendar files."""
 
 from __future__ import annotations
 

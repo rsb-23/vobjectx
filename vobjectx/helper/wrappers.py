@@ -2,7 +2,7 @@ import re
 import warnings
 from functools import wraps
 
-from vobject.helper.config import logger
+from vobjectx.helper.config import logger
 
 
 def deprecated(func=None):

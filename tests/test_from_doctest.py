@@ -3,14 +3,14 @@ from io import StringIO
 
 from dateutil import rrule
 
-import vobject as vo
-from vobject.vcard import Name
+import vobjectx as vo
+from vobjectx.vcard import Name
 
 from .common import get_test_file
 
 
 def test_get_logical_lines():
-    """Converted from doctest of vobject/base.py"""
+    """Converted from doctest of vobjectx/base.py"""
     test_lines = (
         "Line 0 text\n , Line 0 continued.\n"
         "Line 1;encoding=quoted-printable:this is an evil=\n evil=\n format.\n"
@@ -25,8 +25,8 @@ def test_get_logical_lines():
     assert result == expected
 
 
-def test_vobject():
-    """Converted from doctest of vobject/__init__.py"""
+def test_vobjectx():
+    """Converted from doctest of vobjectx/__init__.py"""
     x = vo.iCalendar()
     x.add("vevent")
     assert str(x) == "<VCALENDAR| [<VEVENT| []>]>"

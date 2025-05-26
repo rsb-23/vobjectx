@@ -1,7 +1,7 @@
 import pytest
 
-from vobject.icalendar import Component
-from vobject.ics_diff import get_sort_key, sort_by_uid
+from vobjectx.icalendar import Component
+from vobjectx.ics_diff import get_sort_key, sort_by_uid
 
 # AI generated
 

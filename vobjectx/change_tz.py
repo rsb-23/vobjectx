@@ -6,7 +6,7 @@ from datetime import datetime
 
 from dateutil import tz
 
-import vobject as vo
+import vobjectx as vo
 
 
 def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vo.icalendar.utc):

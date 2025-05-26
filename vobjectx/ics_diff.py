@@ -7,8 +7,8 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from dataclasses import dataclass
 
-import vobject as vo
-from vobject.base import Component, ContentLine
+import vobjectx as vo
+from vobjectx.base import Component, ContentLine
 
 
 def get_sort_key(component):

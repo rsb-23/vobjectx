@@ -31,7 +31,9 @@ jobs:
           pip install build twine
 
       - name: Build package
-        run: python -m build
+        run: |
+          python -m build
+          twine check dist/*
 
       - name: Create GitHub Release
         env:

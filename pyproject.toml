@@ -38,8 +38,8 @@ lint = ["pre-commit", "pylint"]
 test = ["pytest", "pytest-cov"]
 
 [project.scripts]
-ics_diff = "vobject.ics_diff:main"
-change_tz = "vobject.change_tz:main"
+ics_diff = "vobjectx.ics_diff:main"
+change_tz = "vobjectx.change_tz:main"
 
 [project.urls]
 Homepage = "https://github.com/rsb-23/vobjectx"
@@ -48,9 +48,9 @@ Issues = "https://github.com/rsb-23/vobjectx/issues"
 Releases = "https://github.com/rsb-23/vobjectx/releases"
 
 [tool.hatch.version]
-path = "vobject/__about__.py"
+path = "vobjectx/__about__.py"
 [tool.hatch.build.targets.wheel]
-packages = ["vobject"]
+packages = ["vobjectx"]
 
 [tool.hatch.build]
 include = ["README.md", "LICENSE"]
@@ -78,5 +78,5 @@ testpaths = ["tests"]  # Path to your test files
 [tool.coverage.report]
 fail_under = 75.0
 [tool.coverage.run]
-source = ["vobject/"]
+source = ["vobjectx/"]
 omit = ["tests/*", "wrappers.py"]
