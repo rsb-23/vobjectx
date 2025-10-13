@@ -7,7 +7,7 @@ on:
   push:
 
 env:
-  PY_BASE_VERSION: "3.9"
+  PY_BASE_VERSION: "3.10"
 
 jobs:
   coverage-test: # Tests code for base version and coverage
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12', '3.13','3.14' ]
     steps:
       - uses: actions/checkout@v4
         with:
