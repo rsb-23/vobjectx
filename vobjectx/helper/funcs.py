@@ -1,4 +1,5 @@
 import codecs
+import xml.etree.ElementTree as ETree
 from functools import lru_cache
 from random import randint
 from typing import Generator
@@ -18,10 +19,6 @@ def backslash_escape(s: str) -> str:
 @lru_cache()
 def cached_print(*x):
     print(*x)
-
-
-def indent_str(prefix: str = " ", *, level: int = 0, tabwidth: int = 3) -> str:
-    return prefix * level * tabwidth
 
 
 def split_by_size(text: str, byte_size: int) -> Generator:
@@ -48,3 +45,9 @@ def byte_encoder(text: str | bytes, encoding="base64") -> bytes:
     if isinstance(text, str):
         text = text.encode()
     return codecs.encode(text, encoding)  # noqa
+
+
+def pretty_xml(xml_str: str, indent) -> str:
+    root = ETree.fromstring(xml_str)
+    ETree.indent(root, space=" " * indent)
+    return ETree.tostring(root, encoding="unicode")

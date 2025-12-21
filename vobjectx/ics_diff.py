@@ -81,6 +81,23 @@ def _process_component_lists(left_list, right_list) -> list:
 
 def _process_component_pair(left_comp, right_comp):
     """Return None if a match, or a pair of components including UIDs and any differing children."""
+
+    def add_component_diff():
+        for name, child_pair_list in different_components.items():
+            left_components, right_components = zip(*child_pair_list)  # noqa
+            if len(left_components) > 0:
+                _component.left.contents[name] = filter(None, left_components)
+            if len(right_components) > 0:
+                _component.right.contents[name] = filter(None, right_components)
+
+    def add_content_line_diff():
+        for left_child_line, right_child_line in different_content_lines:
+            _name = (left_child_line or right_child_line)[0].name
+            if left_child_line is not None:
+                _component.left.contents[_name] = left_child_line
+            if right_child_line is not None:
+                _component.right.contents[_name] = right_child_line
+
     child_keys = ObjectWithSides(left=left_comp.contents, right=right_comp.contents)
 
     different_content_lines, different_components = [], {}
@@ -112,19 +129,8 @@ def _process_component_pair(left_comp, right_comp):
         _component.left.add("uid").value = uid
         _component.right.add("uid").value = uid
 
-    for name, child_pair_list in different_components.items():
-        left_components, right_components = zip(*child_pair_list)
-        if len(left_components) > 0:
-            _component.left.contents[name] = filter(None, left_components)
-        if len(right_components) > 0:
-            _component.right.contents[name] = filter(None, right_components)
-
-    for left_child_line, right_child_line in different_content_lines:
-        name = (left_child_line or right_child_line)[0].name
-        if left_child_line is not None:
-            _component.left.contents[name] = left_child_line
-        if right_child_line is not None:
-            _component.right.contents[name] = right_child_line
+    add_component_diff()
+    add_content_line_diff()
 
     return _component.left, _component.right
 

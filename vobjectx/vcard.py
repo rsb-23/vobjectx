@@ -10,7 +10,7 @@ from .icalendar import string_to_text_values
 
 
 class Name:
-    def __init__(self, family="", given="", additional="", prefix="", suffix=""):
+    def __init__(self, family="", given="", additional="", *, prefix="", suffix=""):
         """
         Each name attribute can be a string or a list of strings.
         """
@@ -41,7 +41,7 @@ class Name:
 
 
 class Address:
-    def __init__(self, street="", city="", region="", code="", country="", box="", extended=""):
+    def __init__(self, street="", city="", region="", country="", *, code="", box="", extended=""):
         """
         Each name attribute can be a string or a list of strings.
         """

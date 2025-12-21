@@ -5,6 +5,7 @@
 import datetime as dt
 import math
 import socket
+from itertools import chain
 
 import pytz
 from dateutil import rrule, tz
@@ -155,6 +156,48 @@ class TimezoneComponent(Component):
         - tzinfo classes dst method always treats times that could be in either offset as being in the later regime
         """
 
+        def _handle_else():
+            try:
+                old_offset = tzinfo.utcoffset(transition - two_hours)
+                name = tzinfo.tzname(transition)
+                offset = tzinfo.utcoffset(transition)
+            except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
+                # guaranteed that tzinfo is a pytz timezone
+                is_dst = transition_to == "daylight"
+                old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
+                name = tzinfo.tzname(transition, is_dst=is_dst)
+                offset = tzinfo.utcoffset(transition, is_dst=is_dst)
+
+            rule = {
+                "end": None,  # None, or an integer year
+                "start": transition,  # the datetime of transition
+                "month": transition.month,
+                "weekday": transition.weekday(),
+                "hour": transition.hour,
+                "name": name,
+                "plus": int((transition.day - 1) / 7 + 1),  # nth week of the month
+                "minus": _from_last_week(transition),  # nth from last week
+                "offset": offset,
+                "offsetfrom": old_offset,
+            }
+
+            if oldrule is None:
+                working[transition_to] = rule
+            else:
+                plus_match = rule["plus"] == oldrule["plus"]
+                minus_match = rule["minus"] == oldrule["minus"]
+                truth = plus_match or minus_match
+                truth = truth and all(rule[key] == oldrule[key] for key in ("month", "weekday", "hour", "offset"))
+                if truth:
+                    # the old rule is still true, limit to plus or minus
+                    oldrule["plus"] = oldrule["plus"] if plus_match else None
+                    oldrule["minus"] = oldrule["minus"] if minus_match else None
+                else:
+                    # the new rule did not match the old
+                    oldrule["end"] = year - 1
+                    completed[transition_to].append(oldrule)
+                    working[transition_to] = rule
+
         # lists of dictionaries defining rules which are no longer in effect
         completed = {"daylight": [], "standard": []}
 
@@ -200,48 +243,7 @@ class TimezoneComponent(Component):
                         working[transition_to] = None
                 else:
                     # an offset transition was found
-                    try:
-                        old_offset = tzinfo.utcoffset(transition - two_hours)
-                        name = tzinfo.tzname(transition)
-                        offset = tzinfo.utcoffset(transition)
-                    except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
-                        # guaranteed that tzinfo is a pytz timezone
-                        is_dst = transition_to == "daylight"
-                        old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
-                        name = tzinfo.tzname(transition, is_dst=is_dst)
-                        offset = tzinfo.utcoffset(transition, is_dst=is_dst)
-
-                    rule = {
-                        "end": None,  # None, or an integer year
-                        "start": transition,  # the datetime of transition
-                        "month": transition.month,
-                        "weekday": transition.weekday(),
-                        "hour": transition.hour,
-                        "name": name,
-                        "plus": int((transition.day - 1) / 7 + 1),  # nth week of the month
-                        "minus": _from_last_week(transition),  # nth from last week
-                        "offset": offset,
-                        "offsetfrom": old_offset,
-                    }
-
-                    if oldrule is None:
-                        working[transition_to] = rule
-                    else:
-                        plus_match = rule["plus"] == oldrule["plus"]
-                        minus_match = rule["minus"] == oldrule["minus"]
-                        truth = plus_match or minus_match
-                        truth = truth and all(
-                            rule[key] == oldrule[key] for key in ("month", "weekday", "hour", "offset")
-                        )
-                        if truth:
-                            # the old rule is still true, limit to plus or minus
-                            oldrule["plus"] = oldrule["plus"] if plus_match else None
-                            oldrule["minus"] = oldrule["minus"] if minus_match else None
-                        else:
-                            # the new rule did not match the old
-                            oldrule["end"] = year - 1
-                            completed[transition_to].append(oldrule)
-                            working[transition_to] = rule
+                    _handle_else()
 
         for transition_to, rule in working.items():
             if rule is not None:
@@ -358,6 +360,50 @@ class RecurringComponent(Component):
         By default, an RDATE is not created in these cases, and count isn't updated, so dateutil may list a spurious
         occurrence.
         """
+
+        def _handle_rulenames(add_func_):
+            # a Ruby iCalendar library escapes semi-colons in rrules, so also remove any backslashes
+            value = line.value.replace("\\", "")
+            # If dtstart has no time zone, `until` shouldn't get one, either:
+            ignoretz = not isinstance(dtstart, dt.datetime) or dtstart.tzinfo is None
+            try:
+                until = rrule.rrulestr(value, ignoretz=ignoretz)._until
+            except ValueError:
+                # WORKAROUND: dateutil<=2.7.2 doesn't set the time zone of dtstart
+                if ignoretz:
+                    raise
+                utc_now = dt.datetime.now(dt.timezone.utc)
+                until = rrule.rrulestr(value, dtstart=utc_now)._until
+
+            if until is not None and isinstance(dtstart, dt.datetime) and (until.tzinfo != dtstart.tzinfo):
+                # dateutil converts the UNTIL date to a datetime,
+                # check to see if the UNTIL parameter value was a date
+                vals = dict(pair.split("=") for pair in value.upper().split(";"))
+                if len(vals.get("UNTIL", "")) == 8:
+                    until = dt.datetime.combine(until.date(), dtstart.time())
+                # While RFC2445 says UNTIL MUST be UTC, Chandler allows floating recurring events, and uses
+                # floating UNTIL values. Also, some odd floating UNTIL but timezoned DTSTART values have
+                # shown up in the wild, so put floating UNTIL values DTSTART's timezone
+                if until.tzinfo is None:
+                    until = until.replace(tzinfo=dtstart.tzinfo)
+
+                # RFC2445 actually states that UNTIL must be a UTC value. Whilst the changes above work OK,
+                # one problem case is if DTSTART is floating but UNTIL is properly specified as UTC (or with
+                # a TZID). In that case dateutil will fail datetime comparisons. There is no easy solution to
+                # this as there is no obvious timezone (at this point) to do proper floating time offset
+                # comparisons. The best we can do is treat the UNTIL value as floating. This could mean
+                # incorrect determination of the last instance. The better solution here is to encourage
+                # clients to use COUNT rather than UNTIL when DTSTART is floating.
+
+                until = until.replace(tzinfo=None) if dtstart.tzinfo is None else until.astimezone(dtstart.tzinfo)
+
+            value_without_until = ";".join(pair for pair in value.split(";") if pair.split("=")[0].upper() != "UNTIL")
+            rule = rrule.rrulestr(value_without_until, dtstart=dtstart, ignoretz=ignoretz)
+            rule._until = until
+
+            # add the rrule or exrule to the rruleset
+            add_func_(rule)
+
         rruleset = None
         for name in DATESANDRULES:
             addfunc = None
@@ -387,51 +433,7 @@ class RecurringComponent(Component):
                     for _dt in line.value:
                         addfunc(_date_to_datetime(_dt))
                 elif name in RULENAMES:
-                    # a Ruby iCalendar library escapes semi-colons in rrules, so also remove any backslashes
-                    value = line.value.replace("\\", "")
-                    # If dtstart has no time zone, `until` shouldn't get one, either:
-                    ignoretz = not isinstance(dtstart, dt.datetime) or dtstart.tzinfo is None
-                    try:
-                        until = rrule.rrulestr(value, ignoretz=ignoretz)._until
-                    except ValueError:
-                        # WORKAROUND: dateutil<=2.7.2 doesn't set the time zone of dtstart
-                        if ignoretz:
-                            raise
-                        utc_now = dt.datetime.now(dt.timezone.utc)
-                        until = rrule.rrulestr(value, dtstart=utc_now)._until
-
-                    if until is not None and isinstance(dtstart, dt.datetime) and (until.tzinfo != dtstart.tzinfo):
-                        # dateutil converts the UNTIL date to a datetime,
-                        # check to see if the UNTIL parameter value was a date
-                        vals = dict(pair.split("=") for pair in value.upper().split(";"))
-                        if len(vals.get("UNTIL", "")) == 8:
-                            until = dt.datetime.combine(until.date(), dtstart.time())
-                        # While RFC2445 says UNTIL MUST be UTC, Chandler allows floating recurring events, and uses
-                        # floating UNTIL values. Also, some odd floating UNTIL but timezoned DTSTART values have
-                        # shown up in the wild, so put floating UNTIL values DTSTART's timezone
-                        if until.tzinfo is None:
-                            until = until.replace(tzinfo=dtstart.tzinfo)
-
-                        # RFC2445 actually states that UNTIL must be a UTC value. Whilst the changes above work OK,
-                        # one problem case is if DTSTART is floating but UNTIL is properly specified as UTC (or with
-                        # a TZID). In that case dateutil will fail datetime comparisons. There is no easy solution to
-                        # this as there is no obvious timezone (at this point) to do proper floating time offset
-                        # comparisons. The best we can do is treat the UNTIL value as floating. This could mean
-                        # incorrect determination of the last instance. The better solution here is to encourage
-                        # clients to use COUNT rather than UNTIL when DTSTART is floating.
-
-                        until = (
-                            until.replace(tzinfo=None) if dtstart.tzinfo is None else until.astimezone(dtstart.tzinfo)
-                        )
-
-                    value_without_until = ";".join(
-                        pair for pair in value.split(";") if pair.split("=")[0].upper() != "UNTIL"
-                    )
-                    rule = rrule.rrulestr(value_without_until, dtstart=dtstart, ignoretz=ignoretz)
-                    rule._until = until
-
-                    # add the rrule or exrule to the rruleset
-                    addfunc(rule)
+                    _handle_rulenames(add_func_=addfunc)
 
                 if name in ["rrule", "rdate"] and add_rdate:
                     # rlist = rruleset._rrule if name == 'rrule' else rruleset._rdate
@@ -441,16 +443,14 @@ class RecurringComponent(Component):
                     adddtstart = _date_to_datetime(dtstart)
 
                     try:  # sourcery skip
-                        if name == "rrule":
-                            if rruleset._rrule[-1][0] != adddtstart:
-                                rruleset.rdate(adddtstart)
+                        if name == "rdate" and rruleset._rdate[0] != adddtstart:
+                            rruleset.rdate(adddtstart)
 
-                                if rruleset._rrule[-1]._count is not None:
-                                    rruleset._rrule[-1]._count -= 1
+                        elif name == "rrule" and rruleset._rrule[-1][0] != adddtstart:
+                            rruleset.rdate(adddtstart)
 
-                        elif name == "rdate":
-                            if rruleset._rdate[0] != adddtstart:
-                                rruleset.rdate(adddtstart)
+                            if rruleset._rrule[-1]._count is not None:
+                                rruleset._rrule[-1]._count -= 1
                     except IndexError:
                         # it's conceivable that an rrule has 0 datetimes
                         pass
@@ -894,43 +894,38 @@ class VCalendar2(VCalendarComponentBehavior):
         if validate:
             cls.validate(obj, raise_exception=True)
 
-        undo_transform = bool(obj.is_native)
-
         outbuf = buf or get_buffer()
         group_string = "" if obj.group is None else f"{obj.group}."
         if obj.use_begin:
             fold_one_line(outbuf, f"{group_string}BEGIN:{obj.name}", line_length)
 
-        try:
-            first_props = [
-                s for s in cls.sort_first if s in obj.contents and not isinstance(obj.contents[s][0], Component)
-            ]
-            first_components = [
-                s for s in cls.sort_first if s in obj.contents and isinstance(obj.contents[s][0], Component)
-            ]
-        except AllException:
-            first_props = first_components = []
-            # first_components = []
+        props, comps = set(), set()
+        for key in obj.contents.keys():
+            if isinstance(obj.contents[key][0], Component):
+                comps.add(key)
+            else:
+                props.add(key)
 
-        prop_keys = sorted(
-            [k for k in obj.contents.keys() if k not in first_props and not isinstance(obj.contents[k][0], Component)]
-        )
-        comp_keys = sorted(
-            [k for k in obj.contents.keys() if k not in first_components and isinstance(obj.contents[k][0], Component)]
-        )
+        first_props, first_components = [], []
+        for key in cls.sort_first:
+            if key in props:
+                first_props.append(key)
+                props.remove(key)
+            if key in comps:
+                first_components.append(key)
+                comps.remove(key)
 
-        sorted_keys = first_props + prop_keys + first_components + comp_keys
-        children = [o for k in sorted_keys for o in obj.contents[k]]
+        sorted_keys = first_props + sorted(props) + first_components + sorted(comps)
 
-        for child in children:
+        for child in chain.from_iterable(obj.contents[key] for key in sorted_keys):
             # validate is recursive, we only need to validate once
             child.serialize(outbuf, line_length, validate=False)
+
         if obj.use_begin:
             fold_one_line(outbuf, f"{group_string}END:{obj.name}", line_length)
-        out = buf or outbuf.getvalue()
-        if undo_transform:
+        if obj.is_native:
             obj.transform_to_native()
-        return out
+        return outbuf.getvalue()
 
 
 VCalendar2_0 = VCalendar2  # alias #pylint:disable=invalid-name

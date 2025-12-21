@@ -32,7 +32,7 @@ and an equivalent event in hCalendar format with various elements optimized appr
 from datetime import date, timedelta
 
 from .base import register_behavior
-from .helper import Character, get_buffer, indent_str
+from .helper import Character, get_buffer, pretty_xml
 from .icalendar import VCalendar2_0
 
 
@@ -57,6 +57,7 @@ class Event:
 
 class HCalendar(VCalendar2_0):
     name = "HCALENDAR"
+    indent_width = 3
 
     @classmethod
     def serialize(cls, obj, buf=None, line_length=None, validate=True, *args, **kwargs):
@@ -65,14 +66,11 @@ class HCalendar(VCalendar2_0):
         """
 
         outbuf = buf or get_buffer()
-        level, tabwidth = 0, 3  # holds current indentation level
 
-        def buffer_write(s):
-            outbuf.write(f"{indent_str(level=level, tabwidth=tabwidth)}{s}{Character.CRLF}")
-
-        def buffer_write_event(event_child: str, value, *, tag="span", prefix=""):
+        def get_xml(event_child: str, value, *, tag="span", prefix="") -> str:
             if value:
-                buffer_write(f'{prefix}<{tag} class="{event_child}">{value}</{tag}>:')
+                return f'{prefix}<{tag} class="{event_child}">{value}</{tag}>:'
+            return ""
 
         # not serializing optional vcalendar wrapper
 
@@ -80,24 +78,15 @@ class HCalendar(VCalendar2_0):
 
         for event in vevents:
             _event = Event(event)
-            buffer_write('<span class="vevent">')
-            level += 1
-
-            # URL
-            if _event.url:
-                buffer_write(f'<a class="url" href="{_event.url}">')
-                level += 1
-            # SUMMARY
-            buffer_write_event("summary", _event.summary, tag="span")
+            _event_data = [get_xml("summary", _event.summary, tag="span")]  # SUMMARY
 
             # DTSTART
             if _event.dtstart:
                 # TODO: Handle non-datetime formats? Spec says we should handle when dtstart isn't included
 
-                buffer_write(
+                _event_data.append(
                     f'<abbr class="dtstart", title="{_event.machine_date(_event.dtstart)}"'
-                    f">"
-                    f"{_event.human_date(_event.dtstart)}</abbr>"
+                    f">{_event.human_date(_event.dtstart)}</abbr>"
                 )
 
                 # DTEND
@@ -112,21 +101,21 @@ class HCalendar(VCalendar2_0):
                     if type(_event.dtend) is date:
                         human = _event.dtend - timedelta(days=1)
 
-                    buffer_write(
+                    _event_data.append(
                         f'- <abbr class="dtend", title="{_event.machine_date(_event.dtend)}"'
                         f">{_event.human_date(human)}</abbr>"
                     )
 
             # LOCATION
-            buffer_write_event("location", _event.location, tag="span", prefix="at ")
-            buffer_write_event("description", _event.description, tag="div")
+            _event_data.append(get_xml("location", _event.location, tag="span", prefix="at "))
+            _event_data.append(get_xml("description", _event.description, tag="div"))
 
+            _event_str = Character.CRLF.join(_event_data)
             if _event.url:
-                level -= 1
-                buffer_write("</a>")
+                _event_str = f'<a class="url" href="{_event.url}">{_event_str}</a>'
+            _event_str = f'<span class="vevent">{_event_str}</span>'
 
-            level -= 1
-            buffer_write("</span>")  # close vevent
+            outbuf.write(pretty_xml(_event_str, indent=cls.indent_width))
 
         return outbuf.getvalue()
 
