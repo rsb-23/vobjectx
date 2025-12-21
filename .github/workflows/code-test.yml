@@ -1,5 +1,6 @@
 name: Unit Tests
-permissions: { }
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -13,7 +14,7 @@ jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -35,7 +36,7 @@ jobs:
     needs: coverage-test
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -50,9 +51,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.11', '3.12', '3.13','3.14' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
