@@ -1,7 +1,6 @@
 # pylint: disable=c0123,c0302,w0212, r0915
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
-from __future__ import annotations
 
 import datetime as dt
 import math

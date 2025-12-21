@@ -2,8 +2,6 @@
 Compares VTODOs and VEVENTs in two iCalendar sources.
 """
 
-from __future__ import annotations
-
 from argparse import ArgumentParser
 from dataclasses import dataclass
 
@@ -48,7 +46,7 @@ class ObjectWithSides:
     right: Component | ContentLine
 
 
-def _process_component_lists(left_list, right_list):
+def _process_component_lists(left_list, right_list) -> list:
     output = []
     right_index, right_list_size = 0, len(right_list)
 

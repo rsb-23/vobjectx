@@ -1,7 +1,5 @@
 """Definitions and behavior for vCard 3.0"""
 
-from __future__ import annotations
-
 from .base import ContentLine, register_behavior
 from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder

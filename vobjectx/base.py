@@ -1,7 +1,5 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-from __future__ import annotations
-
 import datetime as dt
 
 from .custom_class import ContentDict, Stack
