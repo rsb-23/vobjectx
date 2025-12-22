@@ -3,75 +3,41 @@
 
 
 import datetime as dt
-import math
 import socket
 from itertools import chain
 
 import pytz
 from dateutil import rrule, tz
 
+from vobjectx.helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
+from vobjectx.ical import (
+    TzidRegistry,
+    parse_dtstart,
+    string_to_date,
+    string_to_date_time,
+    string_to_durations,
+    string_to_period,
+    string_to_text_values,
+)
+from vobjectx.ical.ical_helper import date_to_datetime_, from_last_week_
+
 from .__about__ import __version__ as VERSION
 from .base import Component, ContentLine, fold_one_line, register_behavior
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
-from .helper import backslash_escape, get_buffer, get_random_int, logger, split_delta, to_unicode
-from .helper.imports_ import base64, contextlib, partial
-from .parser import string_to_durations
+from .helper import backslash_escape, get_buffer, get_random_int, logger, to_unicode
+from .helper.imports_ import base64, partial
+from .helper.parser import get_transition, tzinfo_eq
+from .helper.serializer import (
+    date_to_string,
+    datetime_to_string,
+    delta_to_offset,
+    period_to_string,
+    timedelta_to_string,
+)
 
-# ------------------------------- Constants ------------------------------------
-DATENAMES = ("rdate", "exdate")
-RULENAMES = ("exrule", "rrule")
-DATESANDRULES = ("exrule", "rrule", "rdate", "exdate")
 PRODID = f"-//VOBJECTX//NONSGML Version {VERSION}//EN"
-
-WEEKDAYS = "MO", "TU", "WE", "TH", "FR", "SA", "SU"
-FREQUENCIES = ("YEARLY", "MONTHLY", "WEEKLY", "DAILY", "HOURLY", "MINUTELY", "SECONDLY")
-
-zero_delta = dt.timedelta(0)
-two_hours = dt.timedelta(hours=2)
-
-# ---------------------------- TZID registry -----------------------------------
-__tzid_map = {}
-
-
-def register_tzid(tzid, tzinfo):
-    """Register a tzid -> tzinfo mapping."""
-    __tzid_map[to_unicode(tzid)] = tzinfo
-
-
-def get_tzid(tzid, smart=True):
-    """Return the tzid if it exists, or None."""
-    _tz = __tzid_map.get(to_unicode(tzid))
-    if smart and tzid and not _tz:
-        try:
-            _tz = pytz.timezone(tzid)
-            register_tzid(to_unicode(tzid), _tz)
-        except pytz.UnknownTimeZoneError as e:
-            logger.error(e)
-    return _tz
-
-
-utc = tz.tzutc()
-register_tzid("UTC", utc)
-
-# -------------------- Helper subclasses ---------------------------------------
-_TRANSITIONS = "daylight", "standard"
-
-
-def _date_to_datetime(dt_obj: dt.datetime | dt.date):
-    if isinstance(dt_obj, dt.datetime):
-        return dt_obj
-    return dt.datetime.fromordinal(dt_obj.toordinal())
-
-
-def _from_last_week(dt_):
-    """
-    How many weeks from the end of the month dt is, starting from 1.
-    """
-    next_month = dt.datetime(dt_.year, dt_.month + 1, 1)
-    time_diff = next_month - dt_
-    days_gap = time_diff.days + bool(time_diff.seconds)
-    return math.ceil(days_gap / 7)
+# --------------------------------
 
 
 # noinspection PyProtectedMember
@@ -111,8 +77,8 @@ class TimezoneComponent(Component):
         Register tzinfo if it's not already registered, return its tzid.
         """
         tzid = cls.pick_tzid(tzinfo)
-        if tzid and not get_tzid(tzid, False):
-            register_tzid(tzid, tzinfo)
+        if tzid and not TzidRegistry.get(tzid, smart=False):
+            TzidRegistry.register(tzid, tzinfo)
         return tzid
 
     @property
@@ -157,6 +123,7 @@ class TimezoneComponent(Component):
         """
 
         def _handle_else():
+            two_hours = dt.timedelta(hours=2)
             try:
                 old_offset = tzinfo.utcoffset(transition - two_hours)
                 name = tzinfo.tzname(transition)
@@ -176,7 +143,7 @@ class TimezoneComponent(Component):
                 "hour": transition.hour,
                 "name": name,
                 "plus": int((transition.day - 1) / 7 + 1),  # nth week of the month
-                "minus": _from_last_week(transition),  # nth from last week
+                "minus": from_last_week_(transition),  # nth from last week
                 "offset": offset,
                 "offsetfrom": old_offset,
             }
@@ -207,7 +174,7 @@ class TimezoneComponent(Component):
         # rule may be based on nth week of the month or the nth from the last
         for year in range(start, end + 1):
             newyear = dt.datetime(year, 1, 1)
-            for transition_to in _TRANSITIONS:
+            for transition_to in TRANSITIONS:
                 transition = get_transition(transition_to, year, tzinfo)
                 oldrule = working[transition_to]
 
@@ -283,7 +250,7 @@ class TimezoneComponent(Component):
                             dtstart=dt.datetime(rule["end"], 1, 1, rule["hour"]),
                         )
                         end_date = du_rule[0]
-                    end_date = end_date.replace(tzinfo=utc) - rule["offsetfrom"]
+                    end_date = end_date.replace(tzinfo=UTC_TZ) - rule["offsetfrom"]
                     end_string = f"UNTIL={datetime_to_string(end_date)}"
 
                 new_rule = ";".join(["FREQ=YEARLY", day_string, f"BYMONTH={rule['month']}", end_string])
@@ -294,7 +261,7 @@ class TimezoneComponent(Component):
         """
         Given a tzinfo class, use known APIs to determine TZID, or use tzname.
         """
-        if tzinfo is None or (not allow_utc and tzinfo_eq(tzinfo, utc)):
+        if tzinfo is None or (not allow_utc and tzinfo_eq(tzinfo, UTC_TZ)):
             # If tzinfo is UTC, we don't need a TZID
             return None
 
@@ -431,7 +398,7 @@ class RecurringComponent(Component):
                 if name in DATENAMES:
                     # ignoring RDATEs with PERIOD values for now
                     for _dt in line.value:
-                        addfunc(_date_to_datetime(_dt))
+                        addfunc(date_to_datetime_(_dt))
                 elif name in RULENAMES:
                     _handle_rulenames(add_func_=addfunc)
 
@@ -440,7 +407,7 @@ class RecurringComponent(Component):
 
                     # dateutils does not work with all-day (dt.date) items so we need to convert to a
                     # dt.datetime (which is what dateutils does internally)
-                    adddtstart = _date_to_datetime(dtstart)
+                    adddtstart = date_to_datetime_(dtstart)
 
                     try:  # sourcery skip
                         if name == "rdate" and rruleset._rdate[0] != adddtstart:
@@ -521,7 +488,7 @@ class RecurringComponent(Component):
 
         is_date = type(dtstart) is dt.date
 
-        dtstart = _date_to_datetime(dtstart)
+        dtstart = date_to_datetime_(dtstart)
         # make sure to convert time zones to UTC
         until_serialize = date_to_string if is_date else partial(datetime_to_string, convert_to_utc=True)
 
@@ -540,7 +507,7 @@ class RecurringComponent(Component):
             elif name in RULENAMES:
                 for rule_item in setlist:
                     buf = get_buffer()
-                    buf.write(f"FREQ={FREQUENCIES[rule_item._freq]}")
+                    buf.write(f"FREQ={rrule.FREQNAMES[rule_item._freq]}")
 
                     values = _parse_values_from_rule(rule_item)
                     for key, paramvals in values.items():
@@ -622,13 +589,13 @@ class RecurringBehavior(VCalendarComponentBehavior):
         This is just a dummy implementation, for now.
         """
         if not hasattr(obj, "uid"):
-            now = dt.datetime.now(utc)
+            now = dt.datetime.now(UTC_TZ)
             now = datetime_to_string(now)
             host = socket.gethostname()
             obj.add(ContentLine("UID", [], f"{now} - {get_random_int()}@{host}"))
 
         if not hasattr(obj, "dtstamp"):
-            now = dt.datetime.now(utc)
+            now = dt.datetime.now(UTC_TZ)
             obj.add("dtstamp").value = now
 
 
@@ -746,7 +713,7 @@ class MultiDateBehavior(Behavior):
         if obj.value == "":
             obj.value = []
             return obj
-        tzinfo = get_tzid(getattr(obj, "tzid_param", None))
+        tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
         value_param = getattr(obj, "value_param", "DATE-TIME").upper()
         val_texts = obj.value.split(",")
         if value_param == "DATE":
@@ -878,7 +845,7 @@ class VCalendar2(VCalendarComponentBehavior):
         for tzid in tzids_used:
             tzid = to_unicode(tzid)
             if tzid != "UTC" and tzid not in oldtzids:
-                obj.add(TimezoneComponent(tzinfo=get_tzid(tzid)))
+                obj.add(TimezoneComponent(tzinfo=TzidRegistry.get(tzid)))
 
     @classmethod
     def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):
@@ -1419,7 +1386,7 @@ class PeriodBehavior(Behavior):
         if obj.value == "":
             obj.value = []
             return obj
-        tzinfo = get_tzid(getattr(obj, "tzid_param", None))
+        tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
         obj.value = [string_to_period(x, tzinfo) for x in obj.value.split(",")]
         return obj
 
@@ -1494,270 +1461,6 @@ list(map(lambda x: register_behavior(TextBehavior, x), text_list))
 
 list(map(lambda x: register_behavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
 register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
-
-
-# ------------------------ Serializing helper functions ------------------------
-def timedelta_to_string(delta):
-    """
-    Convert timedelta to an ical DURATION format: PnYnMnDTnHnMnS
-    """
-    sign = "-" if delta.days < 0 else ""
-    days, hours, minutes, seconds = split_delta(abs(delta))
-
-    output = f"{sign}P"
-    if days:
-        output += f"{days}D"
-    if hours or minutes or seconds:
-        output += "T"
-    elif not days:  # Deal with zero duration
-        output += "T0S"
-    if hours:
-        output += f"{hours}H"
-    if minutes:
-        output += f"{minutes}M"
-    if seconds:
-        output += f"{seconds}S"
-    return output
-
-
-def time_to_string(date_or_date_time):
-    """
-    Wraps date_to_string and datetime_to_string, returning the results of either based on the type of the argument
-    """
-    if hasattr(date_or_date_time, "hour"):
-        return datetime_to_string(date_or_date_time)
-    return date_to_string(date_or_date_time)
-
-
-def date_to_string(date):
-    return date.strftime("%Y%m%d")
-
-
-def datetime_to_string(date_time, convert_to_utc=False) -> str:
-    """
-    Ignore tzinfo unless convert_to_utc. Output string.
-    """
-    if date_time.tzinfo and convert_to_utc:
-        date_time = date_time.astimezone(utc)
-
-    datestr = date_time.strftime("%Y%m%dT%H%M%S")
-    if tzinfo_eq(date_time.tzinfo, utc):
-        datestr += "Z"
-    return datestr
-
-
-def delta_to_offset(delta: dt.timedelta) -> str:
-    """Returns offset in format : ±HHMM"""
-    # Remark : This code assumes day difference = 0
-    abs_delta = split_delta(abs(delta))
-    assert abs_delta.days == 0, "rethink this function uses"
-    sign_string = "-" if delta.days == -1 else "+"
-    return f"{sign_string}{abs_delta.hours:02}{abs_delta.minutes:02}"
-
-
-def period_to_string(period, convert_to_utc=False):
-    txtstart = datetime_to_string(period[0], convert_to_utc)
-    if isinstance(period[1], dt.timedelta):
-        txtend = timedelta_to_string(period[1])
-    else:
-        txtend = datetime_to_string(period[1], convert_to_utc)
-    return f"{txtstart}/{txtend}"
-
-
-# ----------------------- Parsing functions ------------------------------------
-def is_duration(s):
-    return "P" in s[:2].upper()
-
-
-def string_to_date(s: str) -> dt.date:
-    return dt.datetime.strptime(s, "%Y%m%d").date()
-
-
-def string_to_date_time(s, tzinfo=None, strict=False) -> dt.datetime:
-    if not strict:
-        s = s.strip()
-
-    try:
-        _datetime = dt.datetime.strptime(s[:15], "%Y%m%dT%H%M%S")
-        if len(s) > 15 and s[15] == "Z":
-            tzinfo = get_tzid("UTC")
-    except ValueError as e:
-        raise ParseError(f"'{s!s}' is not a valid DATE-TIME") from e
-    year = _datetime.year or 2000
-    if tzinfo is not None and hasattr(tzinfo, "localize"):  # PyTZ case
-        return tzinfo.localize(
-            dt.datetime(year, _datetime.month, _datetime.day, _datetime.hour, _datetime.minute, _datetime.second)
-        )
-    return dt.datetime(
-        year, _datetime.month, _datetime.day, _datetime.hour, _datetime.minute, _datetime.second, 0, tzinfo
-    )
-
-
-# DQUOTE included to work around iCal's penchant for backslash escaping it,
-# although it isn't actually supposed to be escaped according to rfc2445 TEXT
-ESCAPABLE_CHAR_LIST = '\\;,Nn"'
-
-
-def string_to_text_values(s, list_separator=",", char_list=None):
-    """
-    Returns list of strings.
-    """
-    if char_list is None:
-        char_list = ESCAPABLE_CHAR_LIST
-
-    def escaped_char(ch: str) -> str:
-        if ch not in char_list:
-            # leave unrecognized escaped characters for later passes
-            return "\\" + ch
-        return "\n" if ch in "nN" else ch
-
-    current = []
-    results = []
-    to_escape = False
-    for char in s:
-        if to_escape:
-            current.append(escaped_char(char))
-            to_escape = False
-            continue
-
-        if char == "\\":
-            to_escape = True
-        elif char == list_separator:
-            current = "".join(current)
-            results.append(current)
-            current = []
-        else:
-            current.append(char)
-
-    if current or not results:
-        current = "".join(current)
-        results.append(current)
-    return results
-
-
-def parse_dtstart(contentline, allow_signature_mismatch=False):
-    """
-    Convert a contentline's value into a date or date-time.
-
-    A variety of clients don't serialize dates with the appropriate VALUE parameter, so rather than failing on these
-    (technically invalid) lines, if allow_signature_mismatch is True, try to parse both varieties.
-    """
-    tzinfo = get_tzid(getattr(contentline, "tzid_param", None))
-    value_param = getattr(contentline, "value_param", "DATE-TIME").upper()
-    parsed_dtstart = None
-    if value_param == "DATE":
-        parsed_dtstart = string_to_date(contentline.value)
-    elif value_param == "DATE-TIME":
-        try:
-            parsed_dtstart = string_to_date_time(contentline.value, tzinfo)
-        except AllException:
-            if not allow_signature_mismatch:
-                raise
-            parsed_dtstart = string_to_date(contentline.value)
-    return parsed_dtstart
-
-
-def string_to_period(s, tzinfo=None):
-    values = s.split("/")
-    start = string_to_date_time(values[0], tzinfo)
-    val_end = values[1]
-    if not is_duration(val_end):
-        return start, string_to_date_time(val_end, tzinfo)
-    # period-start = date-time "/" dur-value
-    delta = string_to_durations(val_end)[0]
-    return start, delta
-
-
-def get_transition(transition_to, year, tzinfo):
-    """
-    Return the datetime of the transition to/from DST, or None.
-    """
-
-    def first_transition(iter_dates, test_func):
-        """
-        Return the last date not matching test, or None if all tests matched.
-        """
-        success = None
-        for _dt in iter_dates:
-            if not test_func(_dt):
-                success = _dt
-            else:
-                if success is not None:
-                    return success
-        return success  # may be None
-
-    def generate_dates(year_, month_=None, day_=None):
-        """
-        Iterate over possible dates with unspecified values.
-        """
-        months = range(1, 13)
-        days = range(1, 32)
-        hours = range(24)
-        if month_ is None:
-            for _month in months:
-                yield dt.datetime(year_, _month, 1)
-        elif day_ is None:
-            for _day in days:
-                with contextlib.suppress(ValueError):
-                    yield dt.datetime(year_, month_, _day)
-        else:
-            for hour in hours:
-                yield dt.datetime(year_, month_, day_, hour)
-
-    assert transition_to in _TRANSITIONS
-
-    def test(dt_):
-        is_standard_transition = transition_to == "standard"
-        is_daylight_transition = not is_standard_transition
-        try:
-            is_dt_zerodelta = tzinfo.dst(dt_) == zero_delta
-            return is_dt_zerodelta if is_standard_transition else not is_dt_zerodelta
-        except pytz.NonExistentTimeError:
-            return is_daylight_transition  # entering daylight time
-        except pytz.AmbiguousTimeError:
-            return is_standard_transition  # entering standard time
-
-    month_dt = first_transition(generate_dates(year), test)
-    if month_dt is None:
-        return dt.datetime(year, 1, 1)  # new year
-    if month_dt.month == 12:
-        return None
-
-    # there was a good transition somewhere in a non-December month
-    month = month_dt.month
-    day = first_transition(generate_dates(year, month), test).day
-    uncorrected = first_transition(generate_dates(year, month, day), test)
-    if transition_to == "standard":
-        # assuming tzinfo.dst returns a new offset for the first possible hour, we need to add one hour for the
-        # offset change and another hour because first_transition returns the hour before the transition
-        return uncorrected + dt.timedelta(hours=2)
-
-    return uncorrected + dt.timedelta(hours=1)
-
-
-def tzinfo_eq(tzinfo1, tzinfo2, start_year=2000, end_year=2020):
-    """
-    Compare offsets and DST transitions from start_year to end_year.
-    """
-    if tzinfo1 == tzinfo2:
-        return True
-    if tzinfo1 is None or tzinfo2 is None:
-        return False
-
-    def dt_test(_dt):
-        if _dt is None:
-            return True
-        return tzinfo1.utcoffset(_dt) == tzinfo2.utcoffset(_dt)
-
-    if not dt_test(dt.datetime(start_year, 1, 1)):
-        return False
-    for year in range(start_year, end_year):
-        for transition_to in _TRANSITIONS:
-            t1 = get_transition(transition_to, year, tzinfo1)
-            t2 = get_transition(transition_to, year, tzinfo2)
-            if t1 != t2 or not dt_test(t1):
-                return False
-    return True
 
 
 if __name__ == "__main__":

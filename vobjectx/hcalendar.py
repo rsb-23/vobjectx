@@ -90,9 +90,8 @@ class HCalendar(VCalendar2_0):
                 )
 
                 # DTEND
-                if not _event.dtend:
-                    if _event.duration:
-                        _event.dtend = _event.duration + _event.dtstart
+                if not _event.dtend and _event.duration:
+                    _event.dtend = _event.duration + _event.dtstart
                 # TODO: If lacking dtend & duration?
 
                 if _event.dtend:

@@ -8,21 +8,21 @@ from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
 from dateutil.tz import tzutc
 
 from vobjectx import base
+from vobjectx.ical import TzidRegistry
 from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
     VCalendar2_0,
     delta_to_offset,
-    get_tzid,
     parse_dtstart,
-    register_tzid,
     string_to_period,
     string_to_text_values,
     timedelta_to_string,
-    utc,
 )
 
 from .common import TEST_FILE_DIR, get_test_file, two_hours
+
+UTC_TZ = tzutc()
 
 
 def test_parse_dtstart():
@@ -56,12 +56,12 @@ def test_string_to_text_values():
 def test_string_to_period():
     """Test datetime strings"""
     assert string_to_period("19970101T180000Z/19970102T070000Z") == (
-        dt.datetime(1997, 1, 1, 18, 0, tzinfo=tzutc()),
-        dt.datetime(1997, 1, 2, 7, 0, tzinfo=tzutc()),
+        dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
+        dt.datetime(1997, 1, 2, 7, 0, tzinfo=UTC_TZ),
     )
 
     assert string_to_period("19970101T180000Z/PT1H") == (
-        dt.datetime(1997, 1, 1, 18, 0, tzinfo=tzutc()),
+        dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
         dt.timedelta(0, 3600),
     )
 
@@ -126,8 +126,8 @@ def test_pytz_timezone_serializing():
     # Avoid conflicting cached tzinfo from other tests
     def unregister_tzid(tzid):
         """Clear tzid from icalendar TZID registry"""
-        if get_tzid(tzid, False):
-            register_tzid(tzid, tzutc())
+        if TzidRegistry.get(tzid, False):
+            TzidRegistry.register(tzid, UTC_TZ)
 
     unregister_tzid("US/Eastern")
     eastern = pytz.timezone("US/Eastern")
@@ -162,8 +162,8 @@ def test_free_busy():
     _add_tags(
         vfb,
         uid="test",
-        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=utc),
-        dtstart=dt.datetime(2006, 2, 16, 1, tzinfo=utc),
+        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=UTC_TZ),
+        dtstart=dt.datetime(2006, 2, 16, 1, tzinfo=UTC_TZ),
         dtend=None,
     )
     vfb.dtend.value = vfb.dtstart.value + two_hours
@@ -181,9 +181,9 @@ def test_availability():
     _add_tags(
         vcal,
         uid="test",
-        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=utc),
-        dtstart=dt.datetime(2006, 2, 16, 0, tzinfo=utc),
-        dtend=dt.datetime(2006, 2, 17, 0, tzinfo=utc),
+        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=UTC_TZ),
+        dtstart=dt.datetime(2006, 2, 16, 0, tzinfo=UTC_TZ),
+        dtend=dt.datetime(2006, 2, 17, 0, tzinfo=UTC_TZ),
     )
     vcal.add("busytype").value = "BUSY"
 
@@ -191,9 +191,9 @@ def test_availability():
     _add_tags(
         av,
         uid="test1",
-        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=utc),
-        dtstart=dt.datetime(2006, 2, 16, 9, tzinfo=utc),
-        dtend=dt.datetime(2006, 2, 16, 12, tzinfo=utc),
+        dtstamp=dt.datetime(2006, 2, 15, 0, tzinfo=UTC_TZ),
+        dtstart=dt.datetime(2006, 2, 16, 9, tzinfo=UTC_TZ),
+        dtend=dt.datetime(2006, 2, 16, 12, tzinfo=UTC_TZ),
     )
     av.add("summary").value = "Available in the morning"
 
@@ -213,9 +213,9 @@ def test_recurrence():
     Ensure date valued UNTILs in rrules are in a reasonable timezone, and include that day (12/28 in this test)
     """
     dates = get_dates_of_first_component("recurrence.ics")
-    assert dates[0] == dt.datetime(2006, 1, 26, 23, 0, tzinfo=tzutc())
-    assert dates[1] == dt.datetime(2006, 2, 23, 23, 0, tzinfo=tzutc())
-    assert dates[-1] == dt.datetime(2006, 12, 28, 23, 0, tzinfo=tzutc())
+    assert dates[0] == dt.datetime(2006, 1, 26, 23, 0, tzinfo=UTC_TZ)
+    assert dates[1] == dt.datetime(2006, 2, 23, 23, 0, tzinfo=UTC_TZ)
+    assert dates[-1] == dt.datetime(2006, 12, 28, 23, 0, tzinfo=UTC_TZ)
 
 
 def test_recurring_component():
@@ -267,4 +267,4 @@ def test_issue50():
     """
     test_file = get_test_file("vobject_0050.ics")
     cal = base.read_one(test_file)
-    assert dt.datetime(2024, 8, 12, 22, 30, tzinfo=tzutc()) == cal.vevent.dtend.value
+    assert dt.datetime(2024, 8, 12, 22, 30, tzinfo=UTC_TZ) == cal.vevent.dtend.value
