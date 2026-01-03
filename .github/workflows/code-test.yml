@@ -14,10 +14,7 @@ jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      - uses: rsb-23/actions/checkout@main
       - uses: ./.github/test-setup
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
@@ -36,10 +33,7 @@ jobs:
     needs: coverage-test
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      - uses: rsb-23/actions/checkout@main
       - uses: ./.github/test-setup
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
@@ -53,10 +47,7 @@ jobs:
       matrix:
         python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      - uses: rsb-23/actions/checkout@main
       - uses: ./.github/test-setup
         with:
           python-version: ${{ matrix.python-version }}
