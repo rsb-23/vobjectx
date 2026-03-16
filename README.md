@@ -7,19 +7,21 @@
 | Package        | ![pypi-v] ![pypi-downloads]                                                                 |
 | MetaData       | [![license-badge]][license]                                                                 |                                                                                                                                                                                           
 
-vObjectx is intended to be a full-featured Python3 package for parsing and
-generating vCard and vCalendar files.
+vObjectx is a full-featured Python3 package for parsing and generating vCard and vCalendar files.
+
+It is a rewrite of the `py-vobject/vobject v0.9.8` package, updated to use modern Python syntax.  
+It improves code readability, standardization, and overall performance.
 
 ### Disclaimer
 
-⚠️ Documentation is under-development, package is in beta stage.  
-✅ **For production, use [py-vobject/vobject][pyvobject]**
+⚠️ Documentation is under-development, **refer [py-vobject/vobject][pyvobject]**
 
-- This package aims to rewrite `py-vobject/vobject` package with base as `v0.9.8` using latest Python 3 features.
-- It is a practice project to learn about different areas of python package creation and maintainenece.
+### Acknowledgements
+
+See [ACKNOWLEDGEMNTS.md](.github/ACKNOWLEDGEMENTS.md)
 
 ---
-Made with 💚
+Made with 💚 in India
 
 [pyvobject]: https://www.github.com/py-vobject/vobject
 
