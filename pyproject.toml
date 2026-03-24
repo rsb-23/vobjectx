@@ -46,14 +46,15 @@ Repository = "https://github.com/rsb-23/vobjectx"
 Issues = "https://github.com/rsb-23/vobjectx/issues"
 Releases = "https://github.com/rsb-23/vobjectx/releases"
 
+# Build Config
 [tool.hatch.version]
 path = "vobjectx/__about__.py"
+[tool.hatch.build.targets.sdist]
+include = ["vobjectx/", "LICENSE", "README.md", "pyproject.toml"]
 [tool.hatch.build.targets.wheel]
 packages = ["vobjectx"]
 
-[tool.hatch.build]
-include = ["README.md", "LICENSE"]
-
+# Tool Config
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313", "py314"]
 line-length = 120
