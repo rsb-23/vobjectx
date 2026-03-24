@@ -7,10 +7,8 @@ max-line-length = 130
 
 [REFACTORING]
 max-args=8
-max-attributes = 9
-max-branches = 20
-max-locals = 20
-max-positional-arguments = 8
+max-branches = 15
+max-locals = 16
 
 [MESSAGES CONTROL]
 disable=

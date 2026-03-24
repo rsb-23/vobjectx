@@ -35,9 +35,11 @@ class Win32tz(datetime.tzinfo):
 
     def _isdst(self, dt):
         dat = self.data
-        dston = pick_nth_weekday(dt.year, dat.dstmonth, dat.dstdayofweek, dat.dsthour, dat.dstminute, dat.dstweeknumber)
+        dston = pick_nth_weekday(
+            dt.year, dat.dstmonth, dat.dstdayofweek, dat.dsthour, dat.dstminute, whichweek=dat.dstweeknumber
+        )
         dstoff = pick_nth_weekday(
-            dt.year, dat.stdmonth, dat.stddayofweek, dat.stdhour, dat.stdminute, dat.stdweeknumber
+            dt.year, dat.stdmonth, dat.stddayofweek, dat.stdhour, dat.stdminute, whichweek=dat.stdweeknumber
         )
         if dston < dstoff:
             return dston <= dt.replace(tzinfo=None) < dstoff
@@ -48,7 +50,7 @@ class Win32tz(datetime.tzinfo):
         return f"<win32tz - {self.data.display!s}>"
 
 
-def pick_nth_weekday(year, month, dayofweek, hour, minute, whichweek):
+def pick_nth_weekday(year, month, dayofweek, hour, minute, *, whichweek):
     """dayofweek == 0 means Sunday, whichweek > 4 means last instance"""
     first = datetime.datetime(year=year, month=month, hour=hour, minute=minute, day=1)
     weekdayone = first.replace(day=((dayofweek - first.isoweekday()) % 7 + 1))

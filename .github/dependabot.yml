@@ -4,5 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    commit:
-      prefix : ⬆️
+    target-branch: "develop"
+    commit-message:
+      prefix: ⬆️
+    cooldown:
+      default-days: 45

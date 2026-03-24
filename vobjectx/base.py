@@ -1,7 +1,5 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-from __future__ import annotations
-
 import datetime as dt
 
 from .custom_class import ContentDict, Stack
@@ -205,6 +203,7 @@ class ContentLine(VBase):
         An optional line number associated with the contentline.
     """
 
+    # pylint: disable=r0902,r0917
     def __init__(
         self, name, params, value, group=None, encoded=False, is_native=False, line_number=None, *args, **kwds
     ):
@@ -769,6 +768,26 @@ def read_components(stream_or_string, validate=False, transform=True, ignore_unr
     def raise_parse_error(msg):
         raise ParseError(msg, n, inputs=stream_or_string)
 
+    def _handle_end():
+        if not stack:
+            raise raise_parse_error(f"Attempted to end the {vline.value} component but it was never opened")
+        if vline.value.upper() != stack.top_name():
+            raise raise_parse_error(f"{stack.top_name()} component wasn't closed")
+
+        # START matches END
+        if len(stack) == 1:
+            component: Component = stack.pop()
+            component.set_behavior_from_version_line(version_line)
+
+            if validate:
+                component.validate(raise_exception=True)
+            if transform:
+                component.transform_children_to_native()
+            return component  # EXIT POINT
+
+        stack.modify_top(stack.pop())
+        return None
+
     stream = get_buffer(stream_or_string)
     stack = ComponentStack()
     n, version_line = 0, None
@@ -794,23 +813,9 @@ def read_components(stream_or_string, validate=False, transform=True, ignore_unr
                 stack.push(Component())
             stack.top().set_profile(vline.value)
         elif vline.name == "END":
-            if not stack:
-                raise raise_parse_error(f"Attempted to end the {vline.value} component but it was never opened")
-            if vline.value.upper() != stack.top_name():
-                raise raise_parse_error(f"{stack.top_name()} component wasn't closed")
-
-            # START matches END
-            if len(stack) == 1:
-                component: Component = stack.pop()
-                component.set_behavior_from_version_line(version_line)
-
-                if validate:
-                    component.validate(raise_exception=True)
-                if transform:
-                    component.transform_children_to_native()
-                yield component  # EXIT POINT
-            else:
-                stack.modify_top(stack.pop())
+            _component = _handle_end()
+            if _component:
+                yield _component
         else:
             stack.modify_top(vline)  # not a START or END line
 

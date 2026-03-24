@@ -10,30 +10,21 @@ patterns["param_value"] = ' "{qsafe_char!s} * " | {safe_char!s} * '.format(**pat
 
 
 # get a tuple of two elements, one will be empty, the other will have the value
-patterns["param_value_grouped"] = (
-    """
+patterns["param_value_grouped"] = """
 " ( {qsafe_char!s} * )" | ( {safe_char!s} + )
-""".format(
-        **patterns
-    )
-)
+""".format(**patterns)
 
 # get a parameter and its values, without any saved groups
-patterns["param"] = (
-    r"""
+patterns["param"] = r"""
 ; (?: {name!s} )                     # parameter name
 (?:
     (?: = (?: {param_value!s} ) )?   # 0 or more parameter values, multiple
     (?: , (?: {param_value!s} ) )*   # parameters are comma separated
 )*
-""".format(
-        **patterns
-    )
-)
+""".format(**patterns)
 
 # get a parameter, saving groups for name and value (value still needs parsing)
-patterns["params_grouped"] = (
-    r"""
+patterns["params_grouped"] = r"""
 ; ( {name!s} )
 
 (?: =
@@ -42,21 +33,14 @@ patterns["params_grouped"] = (
         (?: , (?: {param_value!s} ) )*   # parameters are comma separated
     )
 )?
-""".format(
-        **patterns
-    )
-)
+""".format(**patterns)
 
 # get a full content line, break it up into group, name, parameters, and value
-patterns["line"] = (
-    r"""
+patterns["line"] = r"""
 ^ ((?P<group> {name!s})\.)?(?P<name> {name!s}) # name group
   (?P<params> ;?(?: {param!s} )* )               # params group (may be empty)
 : (?P<value> .* )$                             # value group
-""".format(
-        **patterns
-    )
-)
+""".format(**patterns)
 
 ' "%(qsafe_char)s*" | %(safe_char)s* '  # what is this line?? - never assigned?
 
@@ -64,15 +48,11 @@ patterns["line"] = (
 # logical line regular expressions
 patterns["lineend"] = r"(?:\r\n|\r|\n|$)"
 patterns["wrap"] = rf"{patterns['lineend']!s} [\t ]"
-patterns["logicallines"] = (
-    r"""
+patterns["logicallines"] = r"""
 (
    (?: [^\r\n] | {wrap!s} )*
    {lineend!s}
 )
-""".format(
-        **patterns
-    )
-)
+""".format(**patterns)
 
 patterns["wraporend"] = r"({wrap!s} | {lineend!s} )".format(**patterns)

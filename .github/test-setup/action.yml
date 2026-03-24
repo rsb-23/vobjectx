@@ -7,13 +7,12 @@ inputs:
     description: "py version"
 
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Setup Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v5.1.1
+      uses: rsb-23/actions/setup-python@main
       with:
         python-version: ${{ inputs.python-version }}
-        cache: pip
     - name: Installing test deps...
       run: |
         python -m pip install --upgrade pip

@@ -31,7 +31,7 @@ def test_vobjectx():
     x.add("vevent")
     assert str(x) == "<VCALENDAR| [<VEVENT| []>]>"
 
-    v, utc = x.vevent, vo.icalendar.utc
+    v, utc = x.vevent, vo.icalendar.UTC_TZ
     v.add("dtstart").value = dt.datetime(2004, 12, 15, 14, tzinfo=utc)
     assert str(v) == "<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>"
     assert str(x) == "<VCALENDAR| [<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>]>"
@@ -59,7 +59,14 @@ def test_unicode_in_vcards():
     card = vo.vCard()
     card.add("fn").value = "Hello\u1234 World!"
     card.add("n").value = vo.vcard.Name("World", "Hello\u1234")
-    card.add("adr").value = vo.vcard.Address("5\u1234 Nowhere, Apt 1", "Berkeley", "CA", "94704", "USA")
+    _full_address = {
+        "street": "5\u1234 Nowhere, Apt 1",
+        "city": "Berkeley",
+        "region": "CA",
+        "country": "USA",
+        "code": "94704",
+    }
+    card.add("adr").value = vo.vcard.Address(**_full_address)
     assert (
         str(card)
         == "<VCARD| [<ADR{}5ሴ Nowhere, Apt 1\nBerkeley, CA 94704\nUSA>, <FN{}Helloሴ World!>, <N{} Helloሴ  World >]>"
@@ -71,7 +78,7 @@ def test_unicode_in_vcards():
 
     # Equality in vCards
     assert card.adr.value != vo.vcard.Address("Just a street")
-    assert card.adr.value == vo.vcard.Address("5\u1234 Nowhere, Apt 1", "Berkeley", "CA", "94704", "USA")
+    assert card.adr.value == vo.vcard.Address(**_full_address)
 
     # Organization (org)
     card.add("org").value = ["Company, Inc.", "main unit", "sub-unit"]

@@ -9,7 +9,7 @@ from dateutil import tz
 import vobjectx as vo
 
 
-def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=vo.icalendar.utc):
+def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=tz.tzutc()):
     """
     Change the timezone of the specified component.
 

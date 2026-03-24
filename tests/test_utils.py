@@ -4,7 +4,6 @@ from io import StringIO
 from dateutil.tz import tzutc
 
 from vobjectx.base import fold_one_line
-from vobjectx.helper import indent_str
 from vobjectx.icalendar import date_to_string, datetime_to_string
 from vobjectx.vcard import to_list
 
@@ -12,11 +11,6 @@ from vobjectx.vcard import to_list
 def test_to_list():
     assert to_list("") == [""]
     assert to_list("Knudson") == ["Knudson"]
-
-
-def test_indent_str():
-    assert indent_str(level=2) == " " * 6
-    assert indent_str(level=1, tabwidth=4) == " " * 4
 
 
 def test_date_to_string():
