@@ -123,13 +123,8 @@ def test_timezone_serializing():
 def test_pytz_timezone_serializing():
     """Serializing with timezones from pytz test"""
 
-    # Avoid conflicting cached tzinfo from other tests
-    def unregister_tzid(tzid):
-        """Clear tzid from icalendar TZID registry"""
-        if TzidRegistry.get(tzid, False):
-            TzidRegistry.register(tzid, UTC_TZ)
+    TzidRegistry.reset()  # Start with clean registry
 
-    unregister_tzid("US/Eastern")
     eastern = pytz.timezone("US/Eastern")
     cal = base.Component("VCALENDAR")
     cal.set_behavior(VCalendar2_0)
@@ -142,9 +137,11 @@ def test_pytz_timezone_serializing():
 
     # Randomly test k zones (just looking for no errors)
     for tzname in sample(pytz.all_timezones, k=50):
-        unregister_tzid(tzname)
         tz = TimezoneComponent(tzinfo=pytz.timezone(tzname))
         tz.serialize()
+
+    # Clear registry to avoid test conflict
+    TzidRegistry.reset()
 
 
 def _add_tags(comp, uid, dtstamp, dtstart, dtend):

@@ -1,5 +1,7 @@
 import datetime as dt
 
+from dateutil.tz import tzutc
+
 from vobjectx.base import ContentLine
 from vobjectx.base import __behavior_registry as behavior_registry
 from vobjectx.base import get_behavior, text_line_to_content_line
@@ -35,6 +37,10 @@ def test_general_behavior():
 
 def test_multi_date_behavior():
     """Test MultiDateBehavior"""
+
+    def _dt_time(y, m, d, h):
+        return repr(dt.datetime(y, m, d, h, tzinfo=tzutc()))
+
     parse_rdate = MultiDateBehavior.transform_to_native
     assert str(parse_rdate(text_line_to_content_line("RDATE;VALUE=DATE:19970304,19970504,19970704,19970904"))) == (
         "<RDATE{'VALUE': ['DATE']}[datetime.date(1997, 3, 4), datetime.date(1997, 5, 4), "
@@ -45,9 +51,8 @@ def test_multi_date_behavior():
             text_line_to_content_line("RDATE;VALUE=PERIOD:19960403T020000Z/19960403T040000Z,19960404T010000Z/PT3H")
         )
     ) == (
-        "<RDATE{'VALUE': ['PERIOD']}[(datetime.datetime(1996, 4, 3, 2, 0, tzinfo=tzutc()), datetime.datetime"
-        "(1996, 4, 3, 4, 0, tzinfo=tzutc())), (datetime.datetime(1996, 4, 4, 1, 0, tzinfo=tzutc()), "
-        + "datetime.timedelta(seconds=10800))]>"
+        f"<RDATE{{'VALUE': ['PERIOD']}}[({_dt_time(1996, 4, 3, 2)}, {_dt_time(1996, 4, 3, 4)}),"
+        f" ({_dt_time(1996, 4, 4, 1)}, datetime.timedelta(seconds=10800))]>"
     )
 
 
