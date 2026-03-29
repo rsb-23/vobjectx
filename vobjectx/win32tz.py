@@ -35,6 +35,10 @@ class Win32tz(datetime.tzinfo):
 
     def _isdst(self, dt):
         dat = self.data
+
+        if not all([dat.dstmonth, dat.dstweeknumber, dat.stdmonth, dat.stdweeknumber]):
+            return False
+
         dston = pick_nth_weekday(
             dt.year, dat.dstmonth, dat.dstdayofweek, dat.dsthour, dat.dstminute, whichweek=dat.dstweeknumber
         )
