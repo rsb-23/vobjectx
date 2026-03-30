@@ -1,22 +1,34 @@
+from functools import lru_cache
+
 from .exceptions import VObjectError
-from .helper.converter import to_vname
+
+
+@lru_cache(32)
+def to_vname(key: str) -> str:
+    key = key.removesuffix("_list")
+    return key.lower().replace("-", "_")
 
 
 class ContentDict(dict):
+    def __getitem__(self, item):
+        return super().__getitem__(to_vname(item))
+
+    def get(self, item, default=None):
+        return super().get(to_vname(item), default)
+
     def __setattr__(self, key, value):
-        if isinstance(value, list):
+        if not isinstance(value, list):
             if key.endswith("_list"):
-                key = key[:-5]
-        elif key.endswith("_list"):
-            raise VObjectError("Component list set to a non-list")
-        else:
+                raise VObjectError("Component list set to a non-list")
             value = [value]
+
         object.__setattr__(self, to_vname(key), value)
 
     def __delattr__(self, key):
-        if key.endswith("_list"):
-            key = key[:-5]
         object.__delattr__(self, to_vname(key))
+
+    def setdefault(self, key, default=None, /):
+        return super().setdefault(to_vname(key), default)
 
 
 class Stack:

@@ -453,9 +453,10 @@ class Component(VBase):
         if name == "contents":
             return object.__getattribute__(self, name)
         try:
+            print(self.contents, name)
             if name.endswith("_list"):
-                return self.contents[to_vname(name, 5)]
-            return self.contents[to_vname(name)][0]
+                return self.contents[name]
+            return self.contents[name][0]
         except KeyError as e:
             raise AttributeError(name) from e
 
@@ -476,7 +477,8 @@ class Component(VBase):
         """
         Return a child's value (the first, by default), or None.
         """
-        child = self.contents.get(to_vname(child_name))
+        print(self.contents)
+        child = self.contents.get(child_name)
         return default if child is None else child[child_number].value
 
     def add(self, obj_or_name, group=None):
@@ -509,7 +511,8 @@ class Component(VBase):
                 obj = ContentLine(obj_or_name, [], "", group)
             if obj.behavior is None and self.behavior is not None and isinstance(obj, ContentLine):
                 obj.behavior = self.behavior.default_behavior
-        self.contents.setdefault(obj.name.lower(), []).append(obj)
+        print(obj_or_name, obj.name)
+        self.contents.setdefault(obj.name, []).append(obj)
         return obj
 
     def remove(self, obj):
