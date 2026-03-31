@@ -1,5 +1,7 @@
 """Definitions and behavior for vCard 3.0"""
 
+from typing import Self
+
 from .base import ContentLine, register_behavior
 from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder
@@ -27,20 +29,20 @@ class Name:
     def __repr__(self):
         return f"<Name: {self!s}>"
 
-    def __eq__(self, other):
-        try:
-            return (
-                self.family == other.family
-                and self.given == other.given
-                and self.additional == other.additional
-                and self.prefix == other.prefix
-                and self.suffix == other.suffix
-            )
-        except AttributeError:
-            return False
+    def __eq__(self, other: Self) -> bool:
+        return (
+            self.family == other.family
+            and self.given == other.given
+            and self.additional == other.additional
+            and self.prefix == other.prefix
+            and self.suffix == other.suffix
+        )
 
 
 class Address:
+    lines = ("box", "extended", "street")
+    one_line = ("city", "region", "code")
+
     def __init__(self, street="", city="", region="", country="", *, code="", box="", extended=""):
         """
         Each name attribute can be a string or a list of strings.
@@ -53,9 +55,6 @@ class Address:
         self.code = code
         self.country = country
 
-    lines = ("box", "extended", "street")
-    one_line = ("city", "region", "code")
-
     def __str__(self):
         lines = "\n".join(to_string(getattr(self, val), "\n") for val in self.lines if getattr(self, val))
         one_line = tuple(to_string(getattr(self, val)) for val in self.one_line)
@@ -67,19 +66,16 @@ class Address:
     def __repr__(self):
         return f"<Address: {self!s}>"
 
-    def __eq__(self, other):
-        try:
-            return (
-                self.box == other.box
-                and self.extended == other.extended
-                and self.street == other.street
-                and self.city == other.city
-                and self.region == other.region
-                and self.code == other.code
-                and self.country == other.country
-            )
-        except AttributeError:
-            return False
+    def __eq__(self, other: Self) -> bool:
+        return (
+            self.box == other.box
+            and self.extended == other.extended
+            and self.street == other.street
+            and self.city == other.city
+            and self.region == other.region
+            and self.code == other.code
+            and self.country == other.country
+        )
 
 
 # ------------------------ Registered Behavior subclasses ----------------------

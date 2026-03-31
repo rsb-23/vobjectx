@@ -453,7 +453,6 @@ class Component(VBase):
         if name == "contents":
             return object.__getattribute__(self, name)
         try:
-            print(self.contents, name)
             if name.endswith("_list"):
                 return self.contents[name]
             return self.contents[name][0]
@@ -511,7 +510,7 @@ class Component(VBase):
                 obj = ContentLine(obj_or_name, [], "", group)
             if obj.behavior is None and self.behavior is not None and isinstance(obj, ContentLine):
                 obj.behavior = self.behavior.default_behavior
-        print(obj_or_name, obj.name)
+
         self.contents.setdefault(obj.name, []).append(obj)
         return obj
 
@@ -546,9 +545,9 @@ class Component(VBase):
         return (i for i in self.get_children() if isinstance(i, ContentLine))
 
     def sort_child_keys(self):
-        try:
+        if self.behavior:
             first = [s for s in self.behavior.sort_first if s in self.contents]
-        except AttributeError:
+        else:
             first = []
         return first + sorted(k for k in self.contents.keys() if k not in first)
 

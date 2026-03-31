@@ -1165,13 +1165,10 @@ class VAlarm(VCalendarComponentBehavior):
         """
         Create default ACTION and TRIGGER if they're not set.
         """
-        try:
-            obj.action
-        except AttributeError:
+        if not hasattr(obj, "action"):
             obj.add("action").value = "AUDIO"
-        try:
-            obj.trigger
-        except AttributeError:
+
+        if not hasattr(obj, "trigger"):
             obj.add("trigger").value = dt.timedelta(0)
 
     @classmethod
