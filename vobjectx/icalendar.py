@@ -789,7 +789,7 @@ class VCalendar2(VCalendarComponentBehavior):
     name = "VCALENDAR"
     description = "vCalendar 2.0, also known as iCalendar."
     version_string = "2.0"
-    sort_first = ("version", "calscale", "method", "prodid", "vtimezone")
+    sort_first = ("VERSION", "CALSCALE", "METHOD", "PRODID", "VTIMEZONE")
     known_children = {
         "CALSCALE": (0, 1, None),  # min, max, behavior_registry id
         "METHOD": (0, 1, None),
@@ -907,7 +907,7 @@ class VTimezone(VCalendarComponentBehavior):
     name = "VTIMEZONE"
     has_native = True
     description = "A grouping of component properties that defines a time zone."
-    sort_first = ("tzid", "last-modified", "tzurl", "standard", "daylight")
+    sort_first = ("TZID", "LAST-MODIFIED", "TZURL", "STANDARD", "DAYLIGHT")
     known_children = {
         "TZID": (1, 1, None),  # min, max, behavior_registry id
         "LAST-MODIFIED": (0, 1, None),
@@ -972,7 +972,7 @@ class VEvent(RecurringBehavior):
     """Event behavior."""
 
     name = "VEVENT"
-    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "RECURRENCE-ID", "DTSTART", "DURATION", "DTEND")
 
     description = 'A grouping of component properties, and possibly including \
                    "VALARM" calendar components, that represents a scheduled \
@@ -1125,7 +1125,7 @@ class VFreeBusy(VCalendarComponentBehavior):
     description = "A grouping of component properties that describe either a \
                    request for free/busy time, describe a response to a request \
                    for free/busy time or describe a published set of busy time."
-    sort_first = ("uid", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "DTSTART", "DURATION", "DTEND")
     known_children = {
         "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CONTACT": (0, 1, None),
@@ -1197,7 +1197,7 @@ class VAvailability(VCalendarComponentBehavior):
 
     name = "VAVAILABILITY"
     description = "A component used to represent a user's available time slots."
-    sort_first = ("uid", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "DTSTART", "DURATION", "DTEND")
     known_children = {
         "UID": (1, 1, None),  # min, max, behavior_registry id
         "DTSTAMP": (1, 1, None),
@@ -1235,7 +1235,7 @@ class Available(RecurringBehavior):
     """
 
     name = "AVAILABLE"
-    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "RECURRENCE-ID", "DTSTART", "DURATION", "DTEND")
     description = "Defines a period of time in which a user is normally available."
     known_children = {
         "DTSTAMP": (1, 1, None),  # min, max, behavior_registry id

@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from .custom_class import ContentDict, ParamDict, Stack
+from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
@@ -215,7 +215,7 @@ class ContentLine(VBase):
 
         self.name = name.upper()
         self.encoded = encoded
-        self.params = ParamDict()
+        self.params = ContentDict()
         self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number

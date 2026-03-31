@@ -144,7 +144,7 @@ class VCard3(VCardBehavior):
     description = "vCard 3.0, defined in rfc2426"
     version_string = "3.0"
     is_component = True
-    sort_first = ("version", "prodid", "uid")
+    sort_first = ("VERSION", "PRODID", "UID")
     known_children = {
         "N": (0, 1, None),  # min, max, behavior_registry id
         "FN": (1, None, None),
