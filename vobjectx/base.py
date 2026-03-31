@@ -2,11 +2,10 @@
 
 import datetime as dt
 
-from .custom_class import ContentDict, Stack
+from .custom_class import ContentDict, ParamDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.converter import to_vname
 from .helper.imports_ import TextIO, contextlib, copy, re, sys
 from .patterns import patterns
 
@@ -216,7 +215,7 @@ class ContentLine(VBase):
 
         self.name = name.upper()
         self.encoded = encoded
-        self.params = {}
+        self.params = ParamDict()
         self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number
@@ -283,9 +282,9 @@ class ContentLine(VBase):
         """
         try:
             if name.endswith("_param"):
-                return self.params[to_vname(name, 6, True)][0]
+                return self.params[name][0]
             if name.endswith("_paramlist"):
-                return self.params[to_vname(name, 10, True)]
+                return self.params[name]
             raise AttributeError(name)
         except KeyError as e:
             raise AttributeError(name) from e
@@ -299,12 +298,12 @@ class ContentLine(VBase):
         """
         if name.endswith("_param"):
             if isinstance(value, list):
-                self.params[to_vname(name, 6, True)] = value
+                self.params[name] = value
             else:
-                self.params[to_vname(name, 6, True)] = [value]
+                self.params[name] = [value]
         elif name.endswith("_paramlist"):
             if isinstance(value, list):
-                self.params[to_vname(name, 10, True)] = value
+                self.params[name] = value
             else:
                 raise VObjectError("Parameter list set to a non-list")
         else:
@@ -316,10 +315,8 @@ class ContentLine(VBase):
 
     def __delattr__(self, name):
         try:
-            if name.endswith("_param"):
-                del self.params[to_vname(name, 6, True)]
-            elif name.endswith("_paramlist"):
-                del self.params[to_vname(name, 10, True)]
+            if name.endswith("_param") or name.endswith("_paramlist"):
+                del self.params[name]
             else:
                 object.__delattr__(self, name)
         except KeyError as e:
@@ -396,16 +393,11 @@ class Component(VBase):
         be serialized.
     """
 
-    def __init__(self, name=None, *args, **kwds):
+    def __init__(self, name="", *args, **kwds):
         super().__init__(*args, **kwds)
         self.contents = ContentDict()
-        if name:
-            self.name = name.upper()
-            self.use_begin = True
-        else:
-            self.name = ""
-            self.use_begin = False
-
+        self.name = name.upper()
+        self.use_begin = bool(name)
         self.auto_behavior()
 
     @classmethod

@@ -1,6 +1,3 @@
-from functools import lru_cache
-
-
 def to_basestring(value: str | bytes) -> bytes:
     """Converts a string argument to a byte string.
 
@@ -28,16 +25,3 @@ def to_unicode(value: str | bytes):
     unchanged.  Otherwise it must be a byte string and is decoded as utf8.
     """
     return value.decode() if isinstance(value, bytes) else value
-
-
-@lru_cache(32)
-def to_vname(name, strip_num=0, upper=False) -> str:
-    """
-    Turn a Python name into an iCalendar style name,
-    optionally uppercase and with characters stripped off.
-    """
-    if upper:
-        name = name.upper()
-    if strip_num != 0:
-        name = name[:-strip_num]
-    return name.replace("_", "-")
