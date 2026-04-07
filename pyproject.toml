@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: Text Processing"
 ]
 keywords = ["vobjectx", "icalendar", "vcard", "ics", "vcs", "hcalendar", "contacts", "vobjectx", "parser"]
-dependencies = ["python-dateutil >= 2.7.3", "pytz>=2019.1", "tzdata; sys_platform == 'win32'"]
+dependencies = ["python-dateutil >= 2.7.3", "tzdata; sys_platform == 'win32'"]
 requires-python = ">=3.10"
 [project.optional-dependencies]
 lint = ["pre-commit", "pylint"]

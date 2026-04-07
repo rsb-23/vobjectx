@@ -1,9 +1,9 @@
 import datetime as dt
 import re
+import zoneinfo
 from random import sample
 
 import dateutil
-import pytz
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
 from dateutil.tz import tzutc
 
@@ -120,24 +120,24 @@ def test_timezone_serializing():
     ev.dtstart.value = dt.datetime(2005, 10, 12, 9, tzinfo=apple)
 
 
-def test_pytz_timezone_serializing():
-    """Serializing with timezones from pytz test"""
+def test_zoneinfo_timezone_serializing():
+    """Serializing with timezones from zoneinfo test"""
 
     TzidRegistry.reset()  # Start with clean registry
 
-    eastern = pytz.timezone("US/Eastern")
+    eastern = zoneinfo.ZoneInfo("US/Eastern")
     cal = base.Component("VCALENDAR")
     cal.set_behavior(VCalendar2_0)
     ev = cal.add("vevent")
-    ev.add("dtstart").value = eastern.localize(dt.datetime(2008, 10, 12, 9))
+    ev.add("dtstart").value = dt.datetime(2008, 10, 12, 9, tzinfo=eastern)
     serialized = cal.serialize()
 
     expected_vtimezone = get_test_file("tz_us_eastern.ics")
     assert expected_vtimezone.replace("\r\n", "\n") in serialized.replace("\r\n", "\n")
 
     # Randomly test k zones (just looking for no errors)
-    for tzname in sample(pytz.all_timezones, k=50):
-        tz = TimezoneComponent(tzinfo=pytz.timezone(tzname))
+    for tzname in sample(list(zoneinfo.available_timezones()), k=50):
+        tz = TimezoneComponent(tzinfo=zoneinfo.ZoneInfo(tzname))
         tz.serialize()
 
     # Clear registry to avoid test conflict

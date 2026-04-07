@@ -5,7 +5,6 @@ import datetime as dt
 import socket
 from itertools import chain
 
-import pytz
 from dateutil import rrule, tz
 
 from vobjectx.helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
@@ -123,16 +122,13 @@ class TimezoneComponent(Component):
 
         def _handle_else():
             two_hours = dt.timedelta(hours=2)
-            try:
-                old_offset = tzinfo.utcoffset(transition - two_hours)
-                name = tzinfo.tzname(transition)
-                offset = tzinfo.utcoffset(transition)
-            except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
-                # guaranteed that tzinfo is a pytz timezone
-                is_dst = transition_to == "daylight"
-                old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
-                name = tzinfo.tzname(transition, is_dst=is_dst)
-                offset = tzinfo.utcoffset(transition, is_dst=is_dst)
+            # Use fold=1 to get the state after the transition
+            # For overlaps, fold=1 is the second instance (Standard time)
+            # For gaps, fold=1 is the instance after the gap (Daylight time)
+
+            old_offset = tzinfo.utcoffset((transition - two_hours).replace(fold=0))
+            name = tzinfo.tzname(transition.replace(fold=1))
+            offset = tzinfo.utcoffset(transition.replace(fold=1))
 
             rule = {
                 "end": None,  # None, or an integer year
@@ -264,7 +260,7 @@ class TimezoneComponent(Component):
             # If tzinfo is UTC, we don't need a TZID
             return None
 
-        for attr in ("tzid", "zone", "_tzid"):
+        for attr in ("key", "tzid", "zone", "_tzid"):
             tzid_ = getattr(tzinfo, attr, None)
             if tzid_:
                 return to_unicode(tzid_)

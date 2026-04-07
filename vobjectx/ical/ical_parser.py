@@ -43,10 +43,7 @@ def string_to_date_time(s, tzinfo=None, strict=False) -> dt.datetime:
     except ValueError as e:
         raise ParseError(f"'{s!s}' is not a valid DATE-TIME") from e
     year = _datetime.year or 2000
-    if tzinfo is not None and hasattr(tzinfo, "localize"):  # PyTZ case
-        return tzinfo.localize(
-            dt.datetime(year, _datetime.month, _datetime.day, _datetime.hour, _datetime.minute, _datetime.second)
-        )
+
     return dt.datetime(
         year, _datetime.month, _datetime.day, _datetime.hour, _datetime.minute, _datetime.second, 0, tzinfo
     )

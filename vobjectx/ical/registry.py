@@ -1,12 +1,11 @@
 """TZID registry for iCalendar timezone handling.
 
 This module provides a registry for mapping timezone identifiers (TZIDs)
-to tzinfo objects, with automatic fallback to pytz for unknown timezones.
+to tzinfo objects, with automatic fallback to zoneinfo for unknown timezones.
 """
 
+import zoneinfo
 from typing import Any
-
-import pytz
 
 from vobjectx.helper import logger, to_unicode
 from vobjectx.helper.constants_tmp import UTC_TZ
@@ -21,9 +20,9 @@ class TzidRegistry:
         _tz = cls.__tzid_map.get(to_unicode(tzid))
         if smart and tzid and not _tz:
             try:
-                _tz = pytz.timezone(tzid)
-                cls.register(tzid, _tz)  # caches pytz timezone
-            except pytz.UnknownTimeZoneError as e:
+                _tz = zoneinfo.ZoneInfo(tzid)
+                cls.register(tzid, _tz)  # caches zoneinfo timezone
+            except zoneinfo.ZoneInfoNotFoundError as e:
                 logger.error(f"Unknown timezone: {tzid} - {e}")
         return _tz
 
