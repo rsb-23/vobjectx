@@ -2,8 +2,7 @@ import datetime as dt
 
 from vobjectx.exceptions import AllException, ParseError
 from vobjectx.helper.imports_ import re
-
-from .registry import TzidRegistry
+from vobjectx.registry import TzidRegistry
 
 
 def string_to_durations(s: str) -> list:

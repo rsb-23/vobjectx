@@ -1,11 +1,13 @@
 """Definitions and behavior for vCard 3.0"""
 
-from .base import ContentLine, register_behavior
+from .base import ContentLine
 from .behavior import Behavior
 from .helper import backslash_escape, byte_decoder, byte_encoder, to_list, to_string
 from .helper.imports_ import Self
 from .icalendar import string_to_text_values
+from .registry import BehaviorRegistry
 
+register_behavior = BehaviorRegistry.register
 # ------------------------ vCard structs ---------------------------------------
 
 

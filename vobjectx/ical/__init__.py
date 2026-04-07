@@ -6,4 +6,3 @@ from .ical_parser import (
     string_to_period,
     string_to_text_values,
 )
-from .registry import TzidRegistry

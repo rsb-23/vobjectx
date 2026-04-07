@@ -8,7 +8,7 @@ from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
 from dateutil.tz import tzutc
 
 from vobjectx import base
-from vobjectx.ical import TzidRegistry
+from vobjectx.behavior import new_from_behavior
 from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
@@ -19,6 +19,7 @@ from vobjectx.icalendar import (
     string_to_text_values,
     timedelta_to_string,
 )
+from vobjectx.registry import TzidRegistry
 
 from .common import TEST_FILE_DIR, get_test_file, two_hours
 
@@ -155,7 +156,7 @@ def test_free_busy():
     """Test freebusy components"""
     test_cal = get_test_file("freebusy.ics")
 
-    vfb = base.new_from_behavior("VFREEBUSY")
+    vfb = new_from_behavior("VFREEBUSY")
     _add_tags(
         vfb,
         uid="test",
@@ -174,7 +175,7 @@ def test_availability():
     """Test availability components"""
     test_cal = get_test_file("availablity.ics")
 
-    vcal = base.new_from_behavior("VAVAILABILITY")
+    vcal = new_from_behavior("VAVAILABILITY")
     _add_tags(
         vcal,
         uid="test",
@@ -184,7 +185,7 @@ def test_availability():
     )
     vcal.add("busytype").value = "BUSY"
 
-    av = base.new_from_behavior("AVAILABLE")
+    av = new_from_behavior("AVAILABLE")
     _add_tags(
         av,
         uid="test1",

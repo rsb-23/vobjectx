@@ -78,7 +78,8 @@ VObjectx Overview
 
 from . import icalendar, vcard
 from .__about__ import __version__
-from .base import new_from_behavior, read_components, read_one
+from .base import read_components, read_one
+from .behavior import new_from_behavior
 
 # Package version
 VERSION = __version__
@@ -92,3 +93,6 @@ def iCalendar():  # pylint:disable=invalid-name
 # noinspection PyPep8Naming
 def vCard():  # pylint:disable=invalid-name
     return new_from_behavior("vcard", "3.0")
+
+
+__all__ = ["icalendar", "vcard", "read_components", "read_one", "new_from_behavior", "iCalendar", "vCard"]

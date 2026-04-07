@@ -3,8 +3,10 @@ import datetime as dt
 import pytest
 
 from vobjectx import read_one
-from vobjectx.base import get_behavior, new_from_behavior, parse_line, read_components
+from vobjectx.base import parse_line, read_components
+from vobjectx.behavior import new_from_behavior
 from vobjectx.exceptions import ParseError
+from vobjectx.registry import BehaviorRegistry
 
 from .common import get_test_file
 
@@ -19,7 +21,7 @@ VCARD_FILE = get_test_file("vcard_with_groups.ics")
 
 def test_default_behavior():
     card = read_one(VCARD_FILE)
-    assert get_behavior("note") is None
+    assert BehaviorRegistry.get("note") is None
     expected = "The Mayor of the great city of Goerlitz in the great country of Germany.\nNext line."
     assert str(card.note.value) == expected
 

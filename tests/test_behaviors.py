@@ -1,11 +1,9 @@
 import datetime as dt
+from zoneinfo import ZoneInfo
 
-from dateutil.tz import tzutc
-
-from vobjectx.base import ContentLine
-from vobjectx.base import __behavior_registry as behavior_registry
-from vobjectx.base import get_behavior, text_line_to_content_line
+from vobjectx.base import ContentLine, text_line_to_content_line
 from vobjectx.icalendar import MultiDateBehavior, PeriodBehavior
+from vobjectx.registry import BehaviorRegistry
 
 from .common import two_hours
 
@@ -14,7 +12,7 @@ def test_general_behavior():
     """Tests for behavior registry, getting and creating a behavior."""
     # Check expected behavior registry
     # fmt: off
-    assert sorted(behavior_registry.keys()) == [
+    assert sorted(BehaviorRegistry.keys()) == [
         "", "ACTION", "ADR", "AVAILABLE", "BUSYTYPE", "CALSCALE", "CATEGORIES", "CLASS", "COMMENT", "COMPLETED",
         "CONTACT", "CREATED", "DAYLIGHT", "DESCRIPTION", "DTEND", "DTSTAMP", "DTSTART", "DUE", "DURATION", "EXDATE",
         "EXRULE", "FN", "FREEBUSY", "GEO", "LABEL", "LAST-MODIFIED", "LOCATION", "METHOD", "N", "ORG", "PHOTO",
@@ -25,13 +23,13 @@ def test_general_behavior():
     # fmt: on
 
     # test get_behavior
-    behavior = get_behavior("VCALENDAR")
+    behavior = BehaviorRegistry.get("VCALENDAR")
     assert str(behavior) == "<class 'vobjectx.icalendar.VCalendar2'>"
     assert behavior.is_component
-    assert get_behavior("invalid_name") is None
+    assert BehaviorRegistry.get("invalid_name") is None
 
     # test for ContentLine (not a component)
-    non_component_behavior = get_behavior("RDATE")
+    non_component_behavior = BehaviorRegistry.get("RDATE")
     assert not non_component_behavior.is_component
 
 
@@ -39,7 +37,7 @@ def test_multi_date_behavior():
     """Test MultiDateBehavior"""
 
     def _dt_time(y, m, d, h):
-        return repr(dt.datetime(y, m, d, h, tzinfo=tzutc()))
+        return repr(dt.datetime(y, m, d, h, tzinfo=ZoneInfo("UTC")))
 
     parse_rdate = MultiDateBehavior.transform_to_native
     assert str(parse_rdate(text_line_to_content_line("RDATE;VALUE=DATE:19970304,19970504,19970704,19970904"))) == (

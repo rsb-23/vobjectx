@@ -9,7 +9,6 @@ from dateutil import rrule, tz
 
 from vobjectx.helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from vobjectx.ical import (
-    TzidRegistry,
     parse_dtstart,
     string_to_date,
     string_to_date_time,
@@ -20,7 +19,7 @@ from vobjectx.ical import (
 from vobjectx.ical.ical_helper import date_to_datetime_, from_last_week_
 
 from .__about__ import __version__ as VERSION
-from .base import Component, ContentLine, fold_one_line, register_behavior
+from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
 from .helper import backslash_escape, get_buffer, get_random_int, logger
@@ -33,7 +32,9 @@ from .helper.serializer import (
     period_to_string,
     timedelta_to_string,
 )
+from .registry import BehaviorRegistry, TzidRegistry
 
+register_behavior = BehaviorRegistry.register
 PRODID = f"-//VOBJECTX//NONSGML Version {VERSION}//EN"
 # --------------------------------
 
@@ -75,8 +76,8 @@ class TimezoneComponent(Component):
         Register tzinfo if it's not already registered, return its tzid.
         """
         tzid = cls.pick_tzid(tzinfo)
-        if tzid and not TzidRegistry.get(tzid, smart=False):
-            TzidRegistry.register(tzid, tzinfo)
+        if tzid:
+            TzidRegistry.register(tzid, tzinfo, exist_ok=True)
         return tzid
 
     @property
