@@ -5,10 +5,19 @@ to tzinfo objects, with automatic fallback to zoneinfo for unknown timezones.
 """
 
 import zoneinfo
-from typing import Any
 
-from vobjectx.helper import logger, to_unicode
+from vobjectx.helper import logger
 from vobjectx.helper.constants_tmp import UTC_TZ
+from vobjectx.helper.imports_ import Any
+
+
+def to_unicode(value: str | bytes):
+    """Converts a string argument to a unicode string.
+
+    If the argument is already a unicode string, it is returned
+    unchanged.  Otherwise it must be a byte string and is decoded as utf8.
+    """
+    return value.decode() if isinstance(value, bytes) else value
 
 
 class TzidRegistry:

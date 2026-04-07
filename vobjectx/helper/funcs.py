@@ -1,10 +1,9 @@
 import codecs
 import xml.etree.ElementTree as ETree
-from functools import lru_cache
 from random import randint
-from typing import Generator
 
 from .constants import Character as Char
+from .imports_ import Generator, lru_cache
 
 
 def get_random_int(max_digit=5) -> int:
@@ -12,8 +11,8 @@ def get_random_int(max_digit=5) -> int:
 
 
 def backslash_escape(s: str) -> str:
-    s = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
-    return s.replace(Char.CRLF, "\\n").replace(Char.LF, "\\n").replace(Char.CR, "\\n")
+    s = s.replace(Char.CRLF, "\n").replace(Char.CR, "\n")
+    return s.translate(str.maketrans({"\\": "\\\\", ";": "\\;", ",": "\\,", "\n": "\\n"}))
 
 
 @lru_cache()

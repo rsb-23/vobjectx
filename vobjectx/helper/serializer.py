@@ -1,7 +1,7 @@
 import datetime as dt
-from typing import Any
 
 from .constants_tmp import UTC_TZ
+from .imports_ import Any
 from .parser import tzinfo_eq
 from .time_funcs import split_delta
 

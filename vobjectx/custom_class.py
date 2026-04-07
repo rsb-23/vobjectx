@@ -1,6 +1,5 @@
-from functools import lru_cache
-
 from .exceptions import VObjectError
+from .helper.imports_ import lru_cache
 
 
 class ContentDict(dict):

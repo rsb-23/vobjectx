@@ -4,10 +4,10 @@ Compares VTODOs and VEVENTs in two iCalendar sources.
 
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from typing import Iterable
 
 import vobjectx as vo
 from vobjectx.base import Component, ContentLine
+from vobjectx.helper.imports_ import Iterable
 
 
 def get_sort_key(component):

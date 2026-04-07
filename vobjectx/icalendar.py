@@ -23,7 +23,7 @@ from .__about__ import __version__ as VERSION
 from .base import Component, ContentLine, fold_one_line, register_behavior
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
-from .helper import backslash_escape, get_buffer, get_random_int, logger, to_unicode
+from .helper import backslash_escape, get_buffer, get_random_int, logger
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
 from .helper.serializer import (
@@ -263,14 +263,14 @@ class TimezoneComponent(Component):
         for attr in ("key", "tzid", "zone", "_tzid"):
             tzid_ = getattr(tzinfo, attr, None)
             if tzid_:
-                return to_unicode(tzid_)
+                return tzid_
 
         # return tzname for standard (non-DST) time
         not_dst = dt.timedelta(0)
         for month in range(1, 13):
             _dt = dt.datetime(2000, month, 1)
             if tzinfo.dst(_dt) == not_dst:
-                return to_unicode(tzinfo.tzname(_dt))
+                return tzinfo.tzname(_dt)
 
         # there was no standard time in 2000!
         raise VObjectError(f"Unable to guess TZID for tzinfo {tzinfo!s}")
@@ -836,9 +836,8 @@ class VCalendar2(VCalendarComponentBehavior):
                     find_tzids(child, table)
 
         find_tzids(obj, tzids_used)
-        oldtzids = [to_unicode(x.tzid.value) for x in getattr(obj, "vtimezone_list", [])]
+        oldtzids = [x.tzid.value for x in getattr(obj, "vtimezone_list", [])]
         for tzid in tzids_used:
-            tzid = to_unicode(tzid)
             if tzid != "UTC" and tzid not in oldtzids:
                 obj.add(TimezoneComponent(tzinfo=TzidRegistry.get(tzid)))
 

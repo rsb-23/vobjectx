@@ -36,6 +36,7 @@ class VBase:
         self.behavior = None
         self.parent_behavior = None
         self.is_native = False
+        self.encoded = False
 
     def copy(self, copyit):
         self.group = copyit.group
@@ -77,7 +78,7 @@ class VBase:
                 behavior = get_behavior(self.name, known_child_tup[2])
                 if behavior is not None:
                     self.set_behavior(behavior, cascade)
-                    if isinstance(self, ContentLine) and self.encoded:  # pylint:disable=e1101
+                    if isinstance(self, ContentLine) and self.encoded:
                         self.behavior.decode(self)
             elif isinstance(self, ContentLine):
                 self.behavior = parent_behavior.default_behavior
@@ -468,7 +469,6 @@ class Component(VBase):
         """
         Return a child's value (the first, by default), or None.
         """
-        print(self.contents)
         child = self.contents.get(child_name)
         return default if child is None else child[child_number].value
 
@@ -722,7 +722,7 @@ def text_line_to_content_line(text, n=None):
     return ContentLine(*parse_line(text, n), **{"encoded": True, "line_number": n})
 
 
-def dquote_escape(param):
+def dquote_escape(param) -> str:
     """
     Return param, or "param" if ',' or ';' or ':' is in param.
     """

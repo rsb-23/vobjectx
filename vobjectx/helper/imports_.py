@@ -6,12 +6,12 @@ import copy
 import re
 import sys
 from functools import lru_cache, partial
-from typing import Any, Callable, Generator, TextIO
+from typing import Any, Callable, Generator, Iterable, Self, TextIO
 
 # fmt: off
 __all__ = [
     "base64", "contextlib", "copy", "re", "sys",
     "lru_cache", "partial",
-    "Any", "Callable", "Generator", "TextIO",
+    "Any", "Callable", "Generator", "Iterable", "Self", "TextIO",
 ]
 # fmt: on
