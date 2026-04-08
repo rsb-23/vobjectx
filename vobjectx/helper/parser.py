@@ -7,7 +7,7 @@ from .imports_ import Any, Callable, Generator, contextlib
 CheckFunc = Callable[[dt.datetime], bool]
 
 
-def get_transition(transition_to, year, tzinfo):
+def get_transition(transition_to: str, year: int, tzinfo: dt.tzinfo) -> dt.datetime | None:
     """
     Return the datetime of the transition to/from DST, or None.
     """
@@ -120,7 +120,7 @@ def get_transition(transition_to, year, tzinfo):
     return check_dt
 
 
-def tzinfo_eq(tzinfo1: dt.tzinfo, tzinfo2: dt.tzinfo, start_year=2000, end_year=2020) -> bool:
+def tzinfo_eq(tzinfo1: dt.tzinfo, tzinfo2: dt.tzinfo, start_year: int = 2000, end_year: int = 2020) -> bool:
     """
     Compare offsets and DST transitions from start_year to end_year.
     """

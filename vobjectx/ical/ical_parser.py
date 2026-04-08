@@ -23,7 +23,7 @@ def string_to_durations(s: str) -> list:
 
 # intermediate file
 # ----------------------- Parsing functions ------------------------------------
-def is_duration(s):
+def is_duration(s: str) -> bool:
     return "P" in s[:2].upper()
 
 
@@ -31,7 +31,7 @@ def string_to_date(s: str) -> dt.date:
     return dt.datetime.strptime(s, "%Y%m%d").date()
 
 
-def string_to_date_time(s, tzinfo=None, strict=False) -> dt.datetime:
+def string_to_date_time(s: str, tzinfo: dt.tzinfo | None = None, strict: bool = False) -> dt.datetime:
     if not strict:
         s = s.strip()
 
@@ -53,13 +53,7 @@ def string_to_date_time(s, tzinfo=None, strict=False) -> dt.datetime:
 ESCAPABLE_CHAR_LIST = '\\;,Nn"'
 
 
-def string_to_text_values(s, list_separator=",", char_list=None):
-    """
-    Returns list of strings.
-    """
-    if char_list is None:
-        char_list = ESCAPABLE_CHAR_LIST
-
+def string_to_text_values(s: str, list_separator: str = ",", char_list: str = ESCAPABLE_CHAR_LIST) -> list[str]:
     def escaped_char(ch: str) -> str:
         if ch not in char_list:
             # leave unrecognized escaped characters for later passes
@@ -90,7 +84,7 @@ def string_to_text_values(s, list_separator=",", char_list=None):
     return results
 
 
-def parse_dtstart(contentline, allow_signature_mismatch=False):
+def parse_dtstart(contentline, allow_signature_mismatch: bool = False) -> dt.datetime | dt.date | None:
     """
     Convert a contentline's value into a date or date-time.
 
@@ -112,7 +106,7 @@ def parse_dtstart(contentline, allow_signature_mismatch=False):
     return parsed_dtstart
 
 
-def string_to_period(s, tzinfo=None):
+def string_to_period(s: str, tzinfo: dt.tzinfo = None) -> tuple[dt.datetime, dt.datetime]:
     values = s.split("/")
     start = string_to_date_time(values[0], tzinfo)
     val_end = values[1]

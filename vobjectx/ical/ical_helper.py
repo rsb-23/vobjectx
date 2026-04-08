@@ -4,13 +4,13 @@ import math
 # -------------------- Helper subclasses ---------------------------------------
 
 
-def date_to_datetime_(dt_obj: dt.datetime | dt.date):
+def date_to_datetime_(dt_obj: dt.datetime | dt.date) -> dt.datetime:
     if isinstance(dt_obj, dt.datetime):
         return dt_obj
     return dt.datetime.fromordinal(dt_obj.toordinal())
 
 
-def from_last_week_(dt_):
+def from_last_week_(dt_: dt.datetime) -> int:
     """
     How many weeks from the end of the month dt is, starting from 1.
     """

@@ -1401,9 +1401,7 @@ class PeriodBehavior(Behavior):
 
 
 class FreeBusy(PeriodBehavior):
-    """
-    Free or busy period of time, must be specified in UTC.
-    """
+    """Free or busy period of time, must be specified in UTC."""
 
     name = "FREEBUSY"
     force_utc = True
@@ -1432,28 +1430,16 @@ list(map(lambda x: register_behavior(DateOrDateTimeBehavior, x), date_time_or_da
 register_behavior(MultiDateBehavior, "RDATE")
 register_behavior(MultiDateBehavior, "EXDATE")
 
+# fmt:off
 text_list = [
-    "CALSCALE",
-    "METHOD",
-    "PRODID",
-    "CLASS",
-    "COMMENT",
-    "DESCRIPTION",
-    "LOCATION",
-    "STATUS",
-    "SUMMARY",
-    "TRANSP",
-    "CONTACT",
-    "RELATED-TO",
-    "UID",
-    "ACTION",
-    "BUSYTYPE",
+    "ACTION", "BUSYTYPE", "CALSCALE", "CLASS", "COMMENT", "CONTACT", "DESCRIPTION", "LOCATION", "METHOD",
+    "PRODID", "RELATED-TO", "STATUS", "SUMMARY", "TRANSP", "UID",
 ]
+# fmt:on
 list(map(lambda x: register_behavior(TextBehavior, x), text_list))
 
 list(map(lambda x: register_behavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
 register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
-
 
 if __name__ == "__main__":
     print(TimezoneComponent().tzinfo.locals())

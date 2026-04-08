@@ -223,15 +223,15 @@ class Photo(VCardTextBehavior):
 register_behavior(Photo)
 
 
-def to_list_or_string(string) -> str | list:
-    string_list = string_to_text_values(string)
-    return string_list[0] if len(string_list) == 1 else string_list
-
-
 def split_fields(string):
     """
     Return a list of strings or lists from a Name or Address.
     """
+
+    def to_list_or_string(x) -> str | list:
+        string_list = string_to_text_values(x)
+        return string_list[0] if len(string_list) == 1 else string_list
+
     return [to_list_or_string(i) for i in string_to_text_values(string, list_separator=";", char_list=";")]
 
 
