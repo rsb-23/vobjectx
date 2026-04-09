@@ -7,22 +7,13 @@ from itertools import chain
 
 from dateutil import rrule, tz
 
-from vobjectx.helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
-from vobjectx.ical import (
-    parse_dtstart,
-    string_to_date,
-    string_to_date_time,
-    string_to_durations,
-    string_to_period,
-    string_to_text_values,
-)
-from vobjectx.ical.ical_helper import date_to_datetime_, from_last_week_
-
+from . import datatypes as vtypes
 from .__about__ import __version__ as VERSION
 from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
 from .helper import backslash_escape, get_buffer, get_random_int, logger
+from .helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
 from .helper.serializer import (
@@ -32,11 +23,11 @@ from .helper.serializer import (
     period_to_string,
     timedelta_to_string,
 )
+from .ical import date_to_datetime_, from_last_week_, parse_dtstart, string_to_text_values
 from .registry import BehaviorRegistry, TzidRegistry
 
 register_behavior = BehaviorRegistry.register
 PRODID = f"-//VOBJECTX//NONSGML Version {VERSION}//EN"
-# --------------------------------
 
 
 # noinspection PyProtectedMember
@@ -707,11 +698,11 @@ class MultiDateBehavior(Behavior):
         value_param = getattr(obj, "value_param", "DATE-TIME").upper()
         val_texts = obj.value.split(",")
         if value_param == "DATE":
-            obj.value = [string_to_date(x) for x in val_texts]
+            obj.value = [vtypes.Date(x).value for x in val_texts]
         elif value_param == "DATE-TIME":
-            obj.value = [string_to_date_time(x, tzinfo) for x in val_texts]
+            obj.value = [vtypes.DateTime(x, tzinfo).value for x in val_texts]
         elif value_param == "PERIOD":
-            obj.value = [string_to_period(x, tzinfo) for x in val_texts]
+            obj.value = [vtypes.Period(x, tzinfo).value for x in val_texts]
         return obj
 
     @staticmethod
@@ -1278,13 +1269,8 @@ class Duration(Behavior):
         if obj.value == "":
             return obj
 
-        deltalist = string_to_durations(obj.value)
-        # When can DURATION have multiple durations?  For now:
-        if len(deltalist) == 1:
-            obj.value = deltalist[0]
-            return obj
-
-        raise ParseError("DURATION must have a single duration string.")
+        obj.value = vtypes.Duration(obj.value).value
+        return obj
 
     @staticmethod
     def transform_from_native(obj):
@@ -1374,7 +1360,7 @@ class PeriodBehavior(Behavior):
             obj.value = []
             return obj
         tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
-        obj.value = [string_to_period(x, tzinfo) for x in obj.value.split(",")]
+        obj.value = [vtypes.Period(x, tzinfo).value for x in obj.value.split(",")]
         return obj
 
     @classmethod

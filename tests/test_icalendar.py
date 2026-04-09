@@ -9,13 +9,13 @@ from dateutil.tz import tzutc
 
 from vobjectx import base
 from vobjectx.behavior import new_from_behavior
+from vobjectx.datatypes import Period
 from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
     VCalendar2_0,
     delta_to_offset,
     parse_dtstart,
-    string_to_period,
     string_to_text_values,
     timedelta_to_string,
 )
@@ -56,12 +56,12 @@ def test_string_to_text_values():
 
 def test_string_to_period():
     """Test datetime strings"""
-    assert string_to_period("19970101T180000Z/19970102T070000Z") == (
+    assert Period("19970101T180000Z/19970102T070000Z").value == (
         dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
         dt.datetime(1997, 1, 2, 7, 0, tzinfo=UTC_TZ),
     )
 
-    assert string_to_period("19970101T180000Z/PT1H") == (
+    assert Period("19970101T180000Z/PT1H").value == (
         dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
         dt.timedelta(0, 3600),
     )
