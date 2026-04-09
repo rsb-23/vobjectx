@@ -1,12 +1,12 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-import datetime as dt
+import re
 
 from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import TextIO, contextlib, copy, re, sys
+from .helper.imports_ import Any, TextIO, contextlib, copy, sys
 from .patterns import patterns
 from .registry import BehaviorRegistry
 
@@ -221,7 +221,7 @@ class ContentLine(VBase):
         self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number
-        self.value: str | dt.date = value
+        self.value: Any = value  # depends on Behavior
 
         def update_table(x):
             if len(x) == 1:

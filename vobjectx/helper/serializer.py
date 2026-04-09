@@ -1,16 +1,13 @@
 import datetime as dt
 
 from .constants_tmp import UTC_TZ
-from .imports_ import Any
 from .parser import tzinfo_eq
 from .time_funcs import split_delta
 
 
 # ------------------------ Serializing helper functions ------------------------
-def timedelta_to_string(delta) -> str:
-    """
-    Convert timedelta to an ical DURATION format: PnYnMnDTnHnMnS
-    """
+def timedelta_to_string(delta: dt.timedelta) -> str:
+    """Convert timedelta to an ical DURATION format: PnYnMnDTnHnMnS"""
     sign = "-" if delta.days < 0 else ""
     days, hours, minutes, seconds = split_delta(abs(delta))
 
@@ -30,23 +27,19 @@ def timedelta_to_string(delta) -> str:
     return output
 
 
-def time_to_string(date_or_date_time) -> str | Any:
-    """
-    Wraps date_to_string and datetime_to_string, returning the results of either based on the type of the argument
-    """
+def time_to_string(date_or_date_time) -> str:
+    """overloading function for date_to_string and datetime_to_string"""
     if hasattr(date_or_date_time, "hour"):
         return datetime_to_string(date_or_date_time)
     return date_to_string(date_or_date_time)
 
 
-def date_to_string(date) -> Any:
+def date_to_string(date) -> str:
     return date.strftime("%Y%m%d")
 
 
 def datetime_to_string(date_time, convert_to_utc=False) -> str:
-    """
-    Ignore tzinfo unless convert_to_utc. Output string.
-    """
+    """Ignore tzinfo unless convert_to_utc. Output string."""
     if date_time.tzinfo and convert_to_utc:
         date_time = date_time.astimezone(UTC_TZ)
 

@@ -15,11 +15,18 @@ def to_unicode(value: str | bytes):
     return value.decode() if isinstance(value, bytes) else value
 
 
-# pylint: disable=r0903
 class BehaviorProtocol(Protocol):
     name: str
     version_string: str
     is_component: bool
+
+    @classmethod
+    def decode(cls, line):
+        pass
+
+    @classmethod
+    def encode(cls, line):
+        pass
 
 
 class BehaviorRegistry:

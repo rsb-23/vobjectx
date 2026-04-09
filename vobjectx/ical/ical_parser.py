@@ -1,7 +1,7 @@
 import datetime as dt
+import re
 
 from vobjectx.exceptions import AllException, ParseError
-from vobjectx.helper.imports_ import re
 from vobjectx.registry import TzidRegistry
 
 

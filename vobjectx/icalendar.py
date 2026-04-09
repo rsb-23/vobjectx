@@ -21,7 +21,7 @@ from vobjectx.ical.ical_helper import date_to_datetime_, from_last_week_
 from .__about__ import __version__ as VERSION
 from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
-from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
+from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
 from .helper import backslash_escape, get_buffer, get_random_int, logger
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
@@ -523,9 +523,7 @@ class TextBehavior(Behavior):
 
     @classmethod
     def decode(cls, line):
-        """
-        Remove backslash escaping from line.value.
-        """
+        """Remove backslash escaping from line.value."""
         if line.encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
@@ -536,9 +534,7 @@ class TextBehavior(Behavior):
 
     @classmethod
     def encode(cls, line):
-        """
-        Backslash escape line.value.
-        """
+        """Backslash escape line.value."""
         if not line.encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
@@ -662,9 +658,7 @@ class DateOrDateTimeBehavior(Behavior):
 
     @staticmethod
     def transform_to_native(obj):
-        """
-        Turn obj.value into a date or dt.
-        """
+        """Turn obj.value into a date or dt."""
         if obj.is_native:
             return obj
         obj.is_native = True
@@ -807,6 +801,29 @@ class VCalendar2(VCalendarComponentBehavior):
 
         VTIMEZONEs will need to exist whenever TZID parameters exist or when datetimes with tzinfo exist.
         """
+
+        def find_tzids(obj_, table: set):
+            if isinstance(obj_, ContentLine) and (obj_.behavior is None or not obj_.behavior.force_utc):
+                if getattr(obj_, "tzid_param", None):
+                    warn_if_true()
+                    table.add(obj_.tzid_param)
+                else:
+                    if type(obj_.value) is list:
+                        for _ in obj_.value:
+                            tzinfo = getattr(obj_.value, "tzinfo", None)
+                            warn_if_true(tzinfo is not None)
+                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                            if tzid_:
+                                table.add(tzid_)
+                    else:
+                        tzinfo = getattr(obj_.value, "tzinfo", None)
+                        tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                        if tzid_:
+                            table.add(tzid_)
+            for child in obj_.get_children():
+                if obj_.name != "VTIMEZONE":
+                    find_tzids(child, table)
+
         for comp in obj.components():
             if comp.behavior is not None:
                 comp.behavior.generate_implicit_parameters(comp)
@@ -814,28 +831,8 @@ class VCalendar2(VCalendarComponentBehavior):
             obj.add(ContentLine("PRODID", [], PRODID))
         if not hasattr(obj, "version"):
             obj.add(ContentLine("VERSION", [], cls.version_string))
-        tzids_used = {}
 
-        def find_tzids(obj_, table):
-            if isinstance(obj_, ContentLine) and (obj_.behavior is None or not obj_.behavior.force_utc):
-                if getattr(obj_, "tzid_param", None):
-                    table[obj_.tzid_param] = 1
-                else:
-                    if type(obj_.value) is list:
-                        for _ in obj_.value:
-                            tzinfo = getattr(obj_.value, "tzinfo", None)
-                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
-                            if tzid_:
-                                table[tzid_] = 1
-                    else:
-                        tzinfo = getattr(obj_.value, "tzinfo", None)
-                        tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
-                        if tzid_:
-                            table[tzid_] = 1
-            for child in obj_.get_children():
-                if obj_.name != "VTIMEZONE":
-                    find_tzids(child, table)
-
+        tzids_used = set()
         find_tzids(obj, tzids_used)
         oldtzids = [x.tzid.value for x in getattr(obj, "vtimezone_list", [])]
         for tzid in tzids_used:
@@ -1273,9 +1270,7 @@ class Duration(Behavior):
 
     @staticmethod
     def transform_to_native(obj):
-        """
-        Turn obj.value into a dt.timedelta.
-        """
+        """Turn obj.value into a dt.timedelta."""
         if obj.is_native:
             return obj
         obj.is_native = True

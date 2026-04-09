@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ETree
 from random import randint
 
 from .constants import Character as Char
-from .imports_ import Generator, lru_cache
+from .imports_ import Iterator, lru_cache
 
 
 def get_random_int(max_digit=5) -> int:
@@ -30,7 +30,7 @@ def cached_print(*x):
     print(*x)
 
 
-def split_by_size(text: str, byte_size: int) -> Generator:
+def split_by_size(text: str, byte_size: int) -> Iterator[str]:
     start = space_count = 0
     encoded = text.encode()
     total_size = len(encoded)
