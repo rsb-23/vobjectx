@@ -5,7 +5,6 @@ from random import sample
 
 import dateutil
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
-from dateutil.tz import tzutc
 
 from vobjectx import base
 from vobjectx.behavior import new_from_behavior
@@ -23,7 +22,7 @@ from vobjectx.registry import TzidRegistry
 
 from .common import TEST_FILE_DIR, get_test_file, two_hours
 
-UTC_TZ = tzutc()
+UTC_TZ = dateutil.tz.tzutc()
 
 
 def test_parse_dtstart():
