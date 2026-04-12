@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: Text Processing"
 ]
 keywords = ["vobjectx", "icalendar", "vcard", "ics", "vcs", "hcalendar", "contacts", "vobjectx", "parser"]
-dependencies = ["python-dateutil >= 2.7.3", "pytz>=2019.1", "tzdata; sys_platform == 'win32'"]
+dependencies = ["python-dateutil >= 2.7.3", "tzdata; sys_platform == 'win32'"]
 requires-python = ">=3.10"
 [project.optional-dependencies]
 lint = ["pre-commit", "pylint"]
@@ -41,6 +41,7 @@ ics_diff = "vobjectx.ics_diff:main"
 change_tz = "vobjectx.change_tz:main"
 
 [project.urls]
+Docs = "https://vobjectx.readthedocs.io"
 Homepage = "https://github.com/rsb-23/vobjectx"
 Repository = "https://github.com/rsb-23/vobjectx"
 Issues = "https://github.com/rsb-23/vobjectx/issues"
@@ -48,7 +49,7 @@ Releases = "https://github.com/rsb-23/vobjectx/releases"
 
 # Build Config
 [tool.hatch.version]
-path = "vobjectx/__about__.py"
+source = "vcs"
 [tool.hatch.build.targets.sdist]
 include = ["vobjectx/", "LICENSE", "README.md", "pyproject.toml"]
 [tool.hatch.build.targets.wheel]

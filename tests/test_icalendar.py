@@ -1,28 +1,28 @@
 import datetime as dt
 import re
+import zoneinfo
 from random import sample
 
 import dateutil
-import pytz
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
-from dateutil.tz import tzutc
 
 from vobjectx import base
-from vobjectx.ical import TzidRegistry
+from vobjectx.behavior import new_from_behavior
+from vobjectx.datatypes import Period
 from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
     VCalendar2_0,
     delta_to_offset,
     parse_dtstart,
-    string_to_period,
     string_to_text_values,
     timedelta_to_string,
 )
+from vobjectx.registry import TzidRegistry
 
 from .common import TEST_FILE_DIR, get_test_file, two_hours
 
-UTC_TZ = tzutc()
+UTC_TZ = dateutil.tz.tzutc()
 
 
 def test_parse_dtstart():
@@ -55,12 +55,12 @@ def test_string_to_text_values():
 
 def test_string_to_period():
     """Test datetime strings"""
-    assert string_to_period("19970101T180000Z/19970102T070000Z") == (
+    assert Period("19970101T180000Z/19970102T070000Z").value == (
         dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
         dt.datetime(1997, 1, 2, 7, 0, tzinfo=UTC_TZ),
     )
 
-    assert string_to_period("19970101T180000Z/PT1H") == (
+    assert Period("19970101T180000Z/PT1H").value == (
         dt.datetime(1997, 1, 1, 18, 0, tzinfo=UTC_TZ),
         dt.timedelta(0, 3600),
     )
@@ -120,31 +120,28 @@ def test_timezone_serializing():
     ev.dtstart.value = dt.datetime(2005, 10, 12, 9, tzinfo=apple)
 
 
-def test_pytz_timezone_serializing():
-    """Serializing with timezones from pytz test"""
+def test_zoneinfo_timezone_serializing():
+    """Serializing with timezones from zoneinfo test"""
 
-    # Avoid conflicting cached tzinfo from other tests
-    def unregister_tzid(tzid):
-        """Clear tzid from icalendar TZID registry"""
-        if TzidRegistry.get(tzid, False):
-            TzidRegistry.register(tzid, UTC_TZ)
+    TzidRegistry.reset()  # Start with clean registry
 
-    unregister_tzid("US/Eastern")
-    eastern = pytz.timezone("US/Eastern")
+    eastern = zoneinfo.ZoneInfo("US/Eastern")
     cal = base.Component("VCALENDAR")
     cal.set_behavior(VCalendar2_0)
     ev = cal.add("vevent")
-    ev.add("dtstart").value = eastern.localize(dt.datetime(2008, 10, 12, 9))
+    ev.add("dtstart").value = dt.datetime(2008, 10, 12, 9, tzinfo=eastern)
     serialized = cal.serialize()
 
     expected_vtimezone = get_test_file("tz_us_eastern.ics")
     assert expected_vtimezone.replace("\r\n", "\n") in serialized.replace("\r\n", "\n")
 
     # Randomly test k zones (just looking for no errors)
-    for tzname in sample(pytz.all_timezones, k=50):
-        unregister_tzid(tzname)
-        tz = TimezoneComponent(tzinfo=pytz.timezone(tzname))
+    for tzname in sample(list(zoneinfo.available_timezones()), k=50):
+        tz = TimezoneComponent(tzinfo=zoneinfo.ZoneInfo(tzname))
         tz.serialize()
+
+    # Clear registry to avoid test conflict
+    TzidRegistry.reset()
 
 
 def _add_tags(comp, uid, dtstamp, dtstart, dtend):
@@ -158,7 +155,7 @@ def test_free_busy():
     """Test freebusy components"""
     test_cal = get_test_file("freebusy.ics")
 
-    vfb = base.new_from_behavior("VFREEBUSY")
+    vfb = new_from_behavior("VFREEBUSY")
     _add_tags(
         vfb,
         uid="test",
@@ -177,7 +174,7 @@ def test_availability():
     """Test availability components"""
     test_cal = get_test_file("availablity.ics")
 
-    vcal = base.new_from_behavior("VAVAILABILITY")
+    vcal = new_from_behavior("VAVAILABILITY")
     _add_tags(
         vcal,
         uid="test",
@@ -187,7 +184,7 @@ def test_availability():
     )
     vcal.add("busytype").value = "BUSY"
 
-    av = base.new_from_behavior("AVAILABLE")
+    av = new_from_behavior("AVAILABLE")
     _add_tags(
         av,
         uid="test1",

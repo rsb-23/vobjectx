@@ -1,19 +1,28 @@
 import codecs
 import xml.etree.ElementTree as ETree
-from functools import lru_cache
 from random import randint
-from typing import Generator
 
 from .constants import Character as Char
+from .imports_ import Iterator, lru_cache
 
 
 def get_random_int(max_digit=5) -> int:
     return randint(0, 10**max_digit)
 
 
+def to_list(string_or_list) -> list:
+    """Turn a string or array value into a list"""
+    return [string_or_list] if isinstance(string_or_list, str) else string_or_list
+
+
+def to_string(value, sep=" ") -> str:
+    """Turn a string or array value into a string"""
+    return sep.join(value) if type(value) in (list, tuple) else value
+
+
 def backslash_escape(s: str) -> str:
-    s = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
-    return s.replace(Char.CRLF, "\\n").replace(Char.LF, "\\n").replace(Char.CR, "\\n")
+    s = s.replace(Char.CRLF, "\n").replace(Char.CR, "\n")
+    return s.translate(str.maketrans({"\\": "\\\\", ";": "\\;", ",": "\\,", "\n": "\\n"}))
 
 
 @lru_cache()
@@ -21,7 +30,7 @@ def cached_print(*x):
     print(*x)
 
 
-def split_by_size(text: str, byte_size: int) -> Generator:
+def split_by_size(text: str, byte_size: int) -> Iterator[str]:
     start = space_count = 0
     encoded = text.encode()
     total_size = len(encoded)
@@ -47,7 +56,7 @@ def byte_encoder(text: str | bytes, encoding="base64") -> bytes:
     return codecs.encode(text, encoding)  # noqa
 
 
-def pretty_xml(xml_str: str, indent) -> str:
+def pretty_xml(xml_str: str, indent: int) -> str:
     root = ETree.fromstring(xml_str)
     ETree.indent(root, space=" " * indent)
     return ETree.tostring(root, encoding="unicode")

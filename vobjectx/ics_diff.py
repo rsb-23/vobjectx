@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import vobjectx as vo
 from vobjectx.base import Component, ContentLine
+from vobjectx.helper.imports_ import Iterable
 
 
 def get_sort_key(component):
@@ -20,12 +21,12 @@ def get_sort_key(component):
 
     def get_recurrence_id():
         recurrence_id = component.get_child_value("recurrence_id", None)
-        return "0000-00-00" if recurrence_id is None else recurrence_id.isoformat()
+        return "0000-00-00" if recurrence_id is None else recurrence_id.isoformat().replace("+00:00", "Z")
 
     return get_uid() + get_sequence() + get_recurrence_id()
 
 
-def sort_by_uid(components):
+def sort_by_uid(components: Iterable):
     return sorted(components, key=get_sort_key)
 
 

@@ -1,3 +1,6 @@
+import warnings
+
+
 class VObjectError(Exception):
     def __init__(self, msg, line_number=None):
         self.msg = msg
@@ -25,3 +28,18 @@ class NativeError(VObjectError):
 
 class AllException(VObjectError):
     pass
+
+
+class UnusedBranchError(VObjectError):
+    def __init__(self):
+        super().__init__("Unexpected Execution : Report a bug", None)
+
+
+def warn_if_true(cond: bool = True, raise_error: bool = True):
+    """Warns if unexpected code excecuttion is encountered."""
+    if not cond:
+        return
+
+    warnings.warn("Unexpected code execution", UserWarning, stacklevel=2)
+    if raise_error:
+        raise UnusedBranchError()

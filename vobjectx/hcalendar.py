@@ -31,9 +31,9 @@ and an equivalent event in hCalendar format with various elements optimized appr
 
 from datetime import date, timedelta
 
-from .base import register_behavior
 from .helper import Character, get_buffer, pretty_xml
 from .icalendar import VCalendar2_0
+from .registry import BehaviorRegistry
 
 
 class Event:
@@ -119,4 +119,4 @@ class HCalendar(VCalendar2_0):
         return outbuf.getvalue()
 
 
-register_behavior(HCalendar)
+BehaviorRegistry.register(HCalendar)

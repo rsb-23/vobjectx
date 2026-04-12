@@ -18,12 +18,13 @@ It improves code readability, standardization, and overall performance.
 
 ### Acknowledgements
 
-See [ACKNOWLEDGEMNTS.md](.github/ACKNOWLEDGEMENTS.md)
+See [ACKNOWLEDGEMENTS.md][acknowledgement]
 
 ---
 Made with 💚 in India
 
 [pyvobject]: https://www.github.com/py-vobject/vobject
+[acknowledgement]: https://github.com/rsb-23/vobjectx/blob/main/.github/ACKNOWLEDGEMENTS.md
 
 [license]: https://github.com/rsb-23/vobjectx/blob/main/LICENSE
 [lint-badge]: https://github.com/rsb-23/vobjectx/actions/workflows/code-lint.yml/badge.svg

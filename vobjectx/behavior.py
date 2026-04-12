@@ -1,5 +1,6 @@
 from .base import Component, ContentLine, default_serialize
 from .exceptions import NativeError, ValidateError, VObjectError
+from .registry import BehaviorRegistry
 
 
 # ------------------------ Abstract class for behavior --------------------------
@@ -172,3 +173,17 @@ class Behavior:
     def value_repr(cls, line):
         """return the representation of the given content line value"""
         return line.value
+
+
+def new_from_behavior(name, id_=None):
+    """
+    Given a name, return a behaviored ContentLine or Component.
+    """
+    name = name.upper()
+    behavior = BehaviorRegistry.get(name, id_)
+    if behavior is None:
+        raise VObjectError(f"No behavior found named {name!s}")
+    obj = Component(name) if behavior.is_component else ContentLine(name, [], "")
+    obj.behavior = behavior
+    obj.is_native = False
+    return obj

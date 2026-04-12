@@ -3,20 +3,12 @@ import datetime as dt
 import pytest
 
 from vobjectx import read_one
-from vobjectx.base import get_behavior, new_from_behavior, parse_line, read_components
+from vobjectx.base import parse_line, read_components
+from vobjectx.behavior import new_from_behavior
 from vobjectx.exceptions import ParseError
+from vobjectx.registry import BehaviorRegistry
 
 from .common import get_test_file
-
-
-# pylint:disable = W0621
-@pytest.fixture(scope="module")
-def class_setup():
-    return {
-        "vcard_file": get_test_file("vcard_with_groups.ics"),
-        "simple_test_cal": get_test_file("simple_test.ics"),
-        "vtodo_file": get_test_file("vtodo.ics"),
-    }
 
 
 def test_vcard_creation():
@@ -24,15 +16,18 @@ def test_vcard_creation():
     assert str(vcard) == "<VCARD| []>"
 
 
-def test_default_behavior(class_setup):
-    card = read_one(class_setup["vcard_file"])
-    assert get_behavior("note") is None
+VCARD_FILE = get_test_file("vcard_with_groups.ics")
+
+
+def test_default_behavior():
+    card = read_one(VCARD_FILE)
+    assert BehaviorRegistry.get("note") is None
     expected = "The Mayor of the great city of Goerlitz in the great country of Germany.\nNext line."
     assert str(card.note.value) == expected
 
 
-def test_with_groups(class_setup):
-    card = read_one(class_setup["vcard_file"])
+def test_with_groups():
+    card = read_one(VCARD_FILE)
     assert str(card.group) == "home"
     assert str(card.tel.group) == "home"
 
@@ -51,8 +46,8 @@ def test_vcard_3_parsing():
         card = new_card
 
 
-def test_read_components(class_setup):
-    cal = next(read_components(class_setup["simple_test_cal"]))
+def test_read_components():
+    cal = next(read_components(get_test_file("simple_test.ics")))
 
     assert str(cal) == "<VCALENDAR| [<VEVENT| [<SUMMARY{'BLAH': ['hi!']}Bastille Day Party>]>]>"
     assert str(cal.vevent.summary) == "<SUMMARY{'BLAH': ['hi!']}Bastille Day Party>"
@@ -96,8 +91,8 @@ def test_parse_line():
         parse_line(":")
 
 
-def test_vtodo(class_setup):
-    obj = read_one(class_setup["vtodo_file"])
+def test_vtodo():
+    obj = read_one(get_test_file("vtodo.ics"))
     obj.vtodo.add("completed")
     obj.vtodo.completed.value = dt.datetime(2015, 5, 5, 13, 30)
     assert obj.vtodo.completed.serialize()[:23] == "COMPLETED:20150505T1330"

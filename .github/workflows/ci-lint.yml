@@ -1,0 +1,19 @@
+name: CI Lint
+permissions: { }
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+
+jobs:
+  lint:
+    uses: rsb-23/actions/.github/workflows/workflow-linter.yml@main
+    permissions:
+      security-events: write
+    with:
+      tools: actionlint,zizmor
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

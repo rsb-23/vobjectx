@@ -1,14 +1,14 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-import datetime as dt
+import re
 
 from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.converter import to_vname
-from .helper.imports_ import TextIO, contextlib, copy, re, sys
+from .helper.imports_ import Any, TextIO, contextlib, copy, sys
 from .patterns import patterns
+from .registry import BehaviorRegistry
 
 
 # --------------------------------- Main classes -------------------------------
@@ -37,6 +37,7 @@ class VBase:
         self.behavior = None
         self.parent_behavior = None
         self.is_native = False
+        self.encoded = False
 
     def copy(self, copyit):
         self.group = copyit.group
@@ -75,10 +76,10 @@ class VBase:
         if parent_behavior is not None:
             known_child_tup = parent_behavior.known_children.get(self.name)
             if known_child_tup is not None:
-                behavior = get_behavior(self.name, known_child_tup[2])
+                behavior = BehaviorRegistry.get(self.name, known_child_tup[2])
                 if behavior is not None:
                     self.set_behavior(behavior, cascade)
-                    if isinstance(self, ContentLine) and self.encoded:  # pylint:disable=e1101
+                    if isinstance(self, ContentLine) and self.encoded:
                         self.behavior.decode(self)
             elif isinstance(self, ContentLine):
                 self.behavior = parent_behavior.default_behavior
@@ -216,11 +217,11 @@ class ContentLine(VBase):
 
         self.name = name.upper()
         self.encoded = encoded
-        self.params = {}
+        self.params = ContentDict()
         self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number
-        self.value: str | dt.date = value
+        self.value: Any = value  # depends on Behavior
 
         def update_table(x):
             if len(x) == 1:
@@ -283,9 +284,9 @@ class ContentLine(VBase):
         """
         try:
             if name.endswith("_param"):
-                return self.params[to_vname(name, 6, True)][0]
+                return self.params[name][0]
             if name.endswith("_paramlist"):
-                return self.params[to_vname(name, 10, True)]
+                return self.params[name]
             raise AttributeError(name)
         except KeyError as e:
             raise AttributeError(name) from e
@@ -299,12 +300,12 @@ class ContentLine(VBase):
         """
         if name.endswith("_param"):
             if isinstance(value, list):
-                self.params[to_vname(name, 6, True)] = value
+                self.params[name] = value
             else:
-                self.params[to_vname(name, 6, True)] = [value]
+                self.params[name] = [value]
         elif name.endswith("_paramlist"):
             if isinstance(value, list):
-                self.params[to_vname(name, 10, True)] = value
+                self.params[name] = value
             else:
                 raise VObjectError("Parameter list set to a non-list")
         else:
@@ -316,10 +317,8 @@ class ContentLine(VBase):
 
     def __delattr__(self, name):
         try:
-            if name.endswith("_param"):
-                del self.params[to_vname(name, 6, True)]
-            elif name.endswith("_paramlist"):
-                del self.params[to_vname(name, 10, True)]
+            if name.endswith("_param") or name.endswith("_paramlist"):
+                del self.params[name]
             else:
                 object.__delattr__(self, name)
         except KeyError as e:
@@ -396,16 +395,11 @@ class Component(VBase):
         be serialized.
     """
 
-    def __init__(self, name=None, *args, **kwds):
+    def __init__(self, name="", *args, **kwds):
         super().__init__(*args, **kwds)
         self.contents = ContentDict()
-        if name:
-            self.name = name.upper()
-            self.use_begin = True
-        else:
-            self.name = ""
-            self.use_begin = False
-
+        self.name = name.upper()
+        self.use_begin = bool(name)
         self.auto_behavior()
 
     @classmethod
@@ -454,8 +448,8 @@ class Component(VBase):
             return object.__getattribute__(self, name)
         try:
             if name.endswith("_list"):
-                return self.contents[to_vname(name, 5)]
-            return self.contents[to_vname(name)][0]
+                return self.contents[name]
+            return self.contents[name][0]
         except KeyError as e:
             raise AttributeError(name) from e
 
@@ -476,7 +470,7 @@ class Component(VBase):
         """
         Return a child's value (the first, by default), or None.
         """
-        child = self.contents.get(to_vname(child_name))
+        child = self.contents.get(child_name)
         return default if child is None else child[child_number].value
 
     def add(self, obj_or_name, group=None):
@@ -497,7 +491,7 @@ class Component(VBase):
             name = obj_or_name.upper()
             try:
                 _id = self.behavior.known_children[name][2]
-                behavior = get_behavior(name, _id)
+                behavior = BehaviorRegistry.get(name, _id)
                 if behavior.is_component:
                     obj = Component(name)
                 else:
@@ -509,7 +503,8 @@ class Component(VBase):
                 obj = ContentLine(obj_or_name, [], "", group)
             if obj.behavior is None and self.behavior is not None and isinstance(obj, ContentLine):
                 obj.behavior = self.behavior.default_behavior
-        self.contents.setdefault(obj.name.lower(), []).append(obj)
+
+        self.contents.setdefault(obj.name, []).append(obj)
         return obj
 
     def remove(self, obj):
@@ -543,9 +538,9 @@ class Component(VBase):
         return (i for i in self.get_children() if isinstance(i, ContentLine))
 
     def sort_child_keys(self):
-        try:
+        if self.behavior:
             first = [s for s in self.behavior.sort_first if s in self.contents]
-        except AttributeError:
+        else:
             first = []
         return first + sorted(k for k in self.contents.keys() if k not in first)
 
@@ -557,7 +552,7 @@ class Component(VBase):
         Set behavior if one matches name, version_line.value.
         """
         _id = None if version_line is None else version_line.value
-        v = get_behavior(self.name, id_=_id)
+        v = BehaviorRegistry.get(self.name, id_=_id)
         if v:
             self.set_behavior(v)
 
@@ -728,7 +723,7 @@ def text_line_to_content_line(text, n=None):
     return ContentLine(*parse_line(text, n), **{"encoded": True, "line_number": n})
 
 
-def dquote_escape(param):
+def dquote_escape(param) -> str:
     """
     Return param, or "param" if ',' or ';' or ':' is in param.
     """
@@ -832,53 +827,3 @@ def read_one(stream, validate=False, transform=True, ignore_unreadable=False, al
     Return the first component from stream.
     """
     return next(read_components(stream, validate, transform, ignore_unreadable, allow_qp))
-
-
-# --------------------------- version registry ---------------------------------
-__behavior_registry = {}
-
-
-def register_behavior(behavior, name=None, default=False, id_=None):
-    """
-    Register the given behavior.
-
-    If default is True (or if this is the first version registered with this
-    name), the version will be the default if no id is given.
-    """
-    if not name:
-        name = behavior.name.upper()
-    if id_ is None:
-        id_ = behavior.version_string
-    if name in __behavior_registry:
-        __behavior_registry[name][id_] = behavior
-        if default:
-            __behavior_registry[name]["default_"] = behavior
-    else:
-        __behavior_registry[name] = {id_: behavior, "default_": behavior}
-
-
-def get_behavior(name, id_=None):
-    """
-    Return a matching behavior if it exists, or None.
-
-    If id is None, return the default for name.
-    """
-    name = name.upper()
-    if name in __behavior_registry:
-        named_registry = __behavior_registry[name]
-        return named_registry.get(id_) or named_registry["default_"]
-    return None
-
-
-def new_from_behavior(name, id_=None):
-    """
-    Given a name, return a behaviored ContentLine or Component.
-    """
-    name = name.upper()
-    behavior = get_behavior(name, id_)
-    if behavior is None:
-        raise VObjectError(f"No behavior found named {name!s}")
-    obj = Component(name) if behavior.is_component else ContentLine(name, [], "")
-    obj.behavior = behavior
-    obj.is_native = False
-    return obj

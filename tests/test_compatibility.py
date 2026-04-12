@@ -5,17 +5,15 @@ from vobjectx.base import read_components
 from .common import get_test_file
 
 
+# fmt:off
 @pytest.mark.parametrize(
     "ics_file_name",
     [
-        "radicale-0816.ics",
-        "radicale-0827.ics",
-        "radicale-1238-0.ics",
-        "radicale-1238-1.ics",
-        "radicale-1238-2.ics",
-        "radicale-1238-3.ics",
+        "radicale-0816.ics", "radicale-0827.ics",
+        "radicale-1238-0.ics", "radicale-1238-1.ics", "radicale-1238-2.ics", "radicale-1238-3.ics",
     ],
 )
+# fmt:on
 def test_radicale_with_quoted_printable(ics_file_name: str):
     """Parameterized test for quoted-printable files."""
     ics_str = get_test_file(ics_file_name)

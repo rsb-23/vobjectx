@@ -1,11 +1,13 @@
 """Definitions and behavior for vCard 3.0"""
 
-from .base import ContentLine, register_behavior
+from .base import ContentLine
 from .behavior import Behavior
-from .helper import backslash_escape, byte_decoder, byte_encoder
-from .helper.converter import to_list, to_string
+from .helper import backslash_escape, byte_decoder, byte_encoder, to_list, to_string
+from .helper.imports_ import Self
 from .icalendar import string_to_text_values
+from .registry import BehaviorRegistry
 
+register_behavior = BehaviorRegistry.register
 # ------------------------ vCard structs ---------------------------------------
 
 
@@ -27,20 +29,20 @@ class Name:
     def __repr__(self):
         return f"<Name: {self!s}>"
 
-    def __eq__(self, other):
-        try:
-            return (
-                self.family == other.family
-                and self.given == other.given
-                and self.additional == other.additional
-                and self.prefix == other.prefix
-                and self.suffix == other.suffix
-            )
-        except AttributeError:
-            return False
+    def __eq__(self, other: Self) -> bool:
+        return (
+            self.family == other.family
+            and self.given == other.given
+            and self.additional == other.additional
+            and self.prefix == other.prefix
+            and self.suffix == other.suffix
+        )
 
 
 class Address:
+    lines = ("box", "extended", "street")
+    one_line = ("city", "region", "code")
+
     def __init__(self, street="", city="", region="", country="", *, code="", box="", extended=""):
         """
         Each name attribute can be a string or a list of strings.
@@ -53,9 +55,6 @@ class Address:
         self.code = code
         self.country = country
 
-    lines = ("box", "extended", "street")
-    one_line = ("city", "region", "code")
-
     def __str__(self):
         lines = "\n".join(to_string(getattr(self, val), "\n") for val in self.lines if getattr(self, val))
         one_line = tuple(to_string(getattr(self, val)) for val in self.one_line)
@@ -67,19 +66,16 @@ class Address:
     def __repr__(self):
         return f"<Address: {self!s}>"
 
-    def __eq__(self, other):
-        try:
-            return (
-                self.box == other.box
-                and self.extended == other.extended
-                and self.street == other.street
-                and self.city == other.city
-                and self.region == other.region
-                and self.code == other.code
-                and self.country == other.country
-            )
-        except AttributeError:
-            return False
+    def __eq__(self, other: Self) -> bool:
+        return (
+            self.box == other.box
+            and self.extended == other.extended
+            and self.street == other.street
+            and self.city == other.city
+            and self.region == other.region
+            and self.code == other.code
+            and self.country == other.country
+        )
 
 
 # ------------------------ Registered Behavior subclasses ----------------------
@@ -148,7 +144,7 @@ class VCard3(VCardBehavior):
     description = "vCard 3.0, defined in rfc2426"
     version_string = "3.0"
     is_component = True
-    sort_first = ("version", "prodid", "uid")
+    sort_first = ("VERSION", "PRODID", "UID")
     known_children = {
         "N": (0, 1, None),  # min, max, behavior_registry id
         "FN": (1, None, None),
@@ -227,15 +223,15 @@ class Photo(VCardTextBehavior):
 register_behavior(Photo)
 
 
-def to_list_or_string(string) -> str | list:
-    string_list = string_to_text_values(string)
-    return string_list[0] if len(string_list) == 1 else string_list
-
-
 def split_fields(string):
     """
     Return a list of strings or lists from a Name or Address.
     """
+
+    def to_list_or_string(x) -> str | list:
+        string_list = string_to_text_values(x)
+        return string_list[0] if len(string_list) == 1 else string_list
+
     return [to_list_or_string(i) for i in string_to_text_values(string, list_separator=";", char_list=";")]
 
 

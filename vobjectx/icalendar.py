@@ -5,26 +5,15 @@ import datetime as dt
 import socket
 from itertools import chain
 
-import pytz
 from dateutil import rrule, tz
 
-from vobjectx.helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
-from vobjectx.ical import (
-    TzidRegistry,
-    parse_dtstart,
-    string_to_date,
-    string_to_date_time,
-    string_to_durations,
-    string_to_period,
-    string_to_text_values,
-)
-from vobjectx.ical.ical_helper import date_to_datetime_, from_last_week_
-
+from . import datatypes as vtypes
 from .__about__ import __version__ as VERSION
-from .base import Component, ContentLine, fold_one_line, register_behavior
+from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
-from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError
-from .helper import backslash_escape, get_buffer, get_random_int, logger, to_unicode
+from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
+from .helper import backslash_escape, get_buffer, get_random_int, logger
+from .helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
 from .helper.serializer import (
@@ -34,9 +23,11 @@ from .helper.serializer import (
     period_to_string,
     timedelta_to_string,
 )
+from .ical import date_to_datetime_, from_last_week_, parse_dtstart, string_to_text_values
+from .registry import BehaviorRegistry, TzidRegistry
 
+register_behavior = BehaviorRegistry.register
 PRODID = f"-//VOBJECTX//NONSGML Version {VERSION}//EN"
-# --------------------------------
 
 
 # noinspection PyProtectedMember
@@ -76,8 +67,8 @@ class TimezoneComponent(Component):
         Register tzinfo if it's not already registered, return its tzid.
         """
         tzid = cls.pick_tzid(tzinfo)
-        if tzid and not TzidRegistry.get(tzid, smart=False):
-            TzidRegistry.register(tzid, tzinfo)
+        if tzid:
+            TzidRegistry.register(tzid, tzinfo, exist_ok=True)
         return tzid
 
     @property
@@ -123,16 +114,13 @@ class TimezoneComponent(Component):
 
         def _handle_else():
             two_hours = dt.timedelta(hours=2)
-            try:
-                old_offset = tzinfo.utcoffset(transition - two_hours)
-                name = tzinfo.tzname(transition)
-                offset = tzinfo.utcoffset(transition)
-            except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
-                # guaranteed that tzinfo is a pytz timezone
-                is_dst = transition_to == "daylight"
-                old_offset = tzinfo.utcoffset(transition - two_hours, is_dst=is_dst)
-                name = tzinfo.tzname(transition, is_dst=is_dst)
-                offset = tzinfo.utcoffset(transition, is_dst=is_dst)
+            # Use fold=1 to get the state after the transition
+            # For overlaps, fold=1 is the second instance (Standard time)
+            # For gaps, fold=1 is the instance after the gap (Daylight time)
+
+            old_offset = tzinfo.utcoffset((transition - two_hours).replace(fold=0))
+            name = tzinfo.tzname(transition.replace(fold=1))
+            offset = tzinfo.utcoffset(transition.replace(fold=1))
 
             rule = {
                 "end": None,  # None, or an integer year
@@ -264,17 +252,17 @@ class TimezoneComponent(Component):
             # If tzinfo is UTC, we don't need a TZID
             return None
 
-        for attr in ("tzid", "zone", "_tzid"):
+        for attr in ("key", "tzid", "zone", "_tzid"):
             tzid_ = getattr(tzinfo, attr, None)
             if tzid_:
-                return to_unicode(tzid_)
+                return tzid_
 
         # return tzname for standard (non-DST) time
         not_dst = dt.timedelta(0)
         for month in range(1, 13):
             _dt = dt.datetime(2000, month, 1)
             if tzinfo.dst(_dt) == not_dst:
-                return to_unicode(tzinfo.tzname(_dt))
+                return tzinfo.tzname(_dt)
 
         # there was no standard time in 2000!
         raise VObjectError(f"Unable to guess TZID for tzinfo {tzinfo!s}")
@@ -526,9 +514,7 @@ class TextBehavior(Behavior):
 
     @classmethod
     def decode(cls, line):
-        """
-        Remove backslash escaping from line.value.
-        """
+        """Remove backslash escaping from line.value."""
         if line.encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
@@ -539,9 +525,7 @@ class TextBehavior(Behavior):
 
     @classmethod
     def encode(cls, line):
-        """
-        Backslash escape line.value.
-        """
+        """Backslash escape line.value."""
         if not line.encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
@@ -665,9 +649,7 @@ class DateOrDateTimeBehavior(Behavior):
 
     @staticmethod
     def transform_to_native(obj):
-        """
-        Turn obj.value into a date or dt.
-        """
+        """Turn obj.value into a date or dt."""
         if obj.is_native:
             return obj
         obj.is_native = True
@@ -716,11 +698,11 @@ class MultiDateBehavior(Behavior):
         value_param = getattr(obj, "value_param", "DATE-TIME").upper()
         val_texts = obj.value.split(",")
         if value_param == "DATE":
-            obj.value = [string_to_date(x) for x in val_texts]
+            obj.value = [vtypes.Date(x).value for x in val_texts]
         elif value_param == "DATE-TIME":
-            obj.value = [string_to_date_time(x, tzinfo) for x in val_texts]
+            obj.value = [vtypes.DateTime(x, tzinfo).value for x in val_texts]
         elif value_param == "PERIOD":
-            obj.value = [string_to_period(x, tzinfo) for x in val_texts]
+            obj.value = [vtypes.Period(x, tzinfo).value for x in val_texts]
         return obj
 
     @staticmethod
@@ -789,7 +771,7 @@ class VCalendar2(VCalendarComponentBehavior):
     name = "VCALENDAR"
     description = "vCalendar 2.0, also known as iCalendar."
     version_string = "2.0"
-    sort_first = ("version", "calscale", "method", "prodid", "vtimezone")
+    sort_first = ("VERSION", "CALSCALE", "METHOD", "PRODID", "VTIMEZONE")
     known_children = {
         "CALSCALE": (0, 1, None),  # min, max, behavior_registry id
         "METHOD": (0, 1, None),
@@ -810,6 +792,29 @@ class VCalendar2(VCalendarComponentBehavior):
 
         VTIMEZONEs will need to exist whenever TZID parameters exist or when datetimes with tzinfo exist.
         """
+
+        def find_tzids(obj_, table: set):
+            if isinstance(obj_, ContentLine) and (obj_.behavior is None or not obj_.behavior.force_utc):
+                if getattr(obj_, "tzid_param", None):
+                    warn_if_true()
+                    table.add(obj_.tzid_param)
+                else:
+                    if type(obj_.value) is list:
+                        for _ in obj_.value:
+                            tzinfo = getattr(obj_.value, "tzinfo", None)
+                            warn_if_true(tzinfo is not None)
+                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                            if tzid_:
+                                table.add(tzid_)
+                    else:
+                        tzinfo = getattr(obj_.value, "tzinfo", None)
+                        tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                        if tzid_:
+                            table.add(tzid_)
+            for child in obj_.get_children():
+                if obj_.name != "VTIMEZONE":
+                    find_tzids(child, table)
+
         for comp in obj.components():
             if comp.behavior is not None:
                 comp.behavior.generate_implicit_parameters(comp)
@@ -817,32 +822,11 @@ class VCalendar2(VCalendarComponentBehavior):
             obj.add(ContentLine("PRODID", [], PRODID))
         if not hasattr(obj, "version"):
             obj.add(ContentLine("VERSION", [], cls.version_string))
-        tzids_used = {}
 
-        def find_tzids(obj_, table):
-            if isinstance(obj_, ContentLine) and (obj_.behavior is None or not obj_.behavior.force_utc):
-                if getattr(obj_, "tzid_param", None):
-                    table[obj_.tzid_param] = 1
-                else:
-                    if type(obj_.value) is list:
-                        for _ in obj_.value:
-                            tzinfo = getattr(obj_.value, "tzinfo", None)
-                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
-                            if tzid_:
-                                table[tzid_] = 1
-                    else:
-                        tzinfo = getattr(obj_.value, "tzinfo", None)
-                        tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
-                        if tzid_:
-                            table[tzid_] = 1
-            for child in obj_.get_children():
-                if obj_.name != "VTIMEZONE":
-                    find_tzids(child, table)
-
+        tzids_used = set()
         find_tzids(obj, tzids_used)
-        oldtzids = [to_unicode(x.tzid.value) for x in getattr(obj, "vtimezone_list", [])]
+        oldtzids = [x.tzid.value for x in getattr(obj, "vtimezone_list", [])]
         for tzid in tzids_used:
-            tzid = to_unicode(tzid)
             if tzid != "UTC" and tzid not in oldtzids:
                 obj.add(TimezoneComponent(tzinfo=TzidRegistry.get(tzid)))
 
@@ -907,7 +891,7 @@ class VTimezone(VCalendarComponentBehavior):
     name = "VTIMEZONE"
     has_native = True
     description = "A grouping of component properties that defines a time zone."
-    sort_first = ("tzid", "last-modified", "tzurl", "standard", "daylight")
+    sort_first = ("TZID", "LAST-MODIFIED", "TZURL", "STANDARD", "DAYLIGHT")
     known_children = {
         "TZID": (1, 1, None),  # min, max, behavior_registry id
         "LAST-MODIFIED": (0, 1, None),
@@ -972,7 +956,7 @@ class VEvent(RecurringBehavior):
     """Event behavior."""
 
     name = "VEVENT"
-    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "RECURRENCE-ID", "DTSTART", "DURATION", "DTEND")
 
     description = 'A grouping of component properties, and possibly including \
                    "VALARM" calendar components, that represents a scheduled \
@@ -1125,7 +1109,7 @@ class VFreeBusy(VCalendarComponentBehavior):
     description = "A grouping of component properties that describe either a \
                    request for free/busy time, describe a response to a request \
                    for free/busy time or describe a published set of busy time."
-    sort_first = ("uid", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "DTSTART", "DURATION", "DTEND")
     known_children = {
         "DTSTART": (0, 1, None),  # min, max, behavior_registry id
         "CONTACT": (0, 1, None),
@@ -1165,13 +1149,10 @@ class VAlarm(VCalendarComponentBehavior):
         """
         Create default ACTION and TRIGGER if they're not set.
         """
-        try:
-            obj.action
-        except AttributeError:
+        if not hasattr(obj, "action"):
             obj.add("action").value = "AUDIO"
-        try:
-            obj.trigger
-        except AttributeError:
+
+        if not hasattr(obj, "trigger"):
             obj.add("trigger").value = dt.timedelta(0)
 
     @classmethod
@@ -1200,7 +1181,7 @@ class VAvailability(VCalendarComponentBehavior):
 
     name = "VAVAILABILITY"
     description = "A component used to represent a user's available time slots."
-    sort_first = ("uid", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "DTSTART", "DURATION", "DTEND")
     known_children = {
         "UID": (1, 1, None),  # min, max, behavior_registry id
         "DTSTAMP": (1, 1, None),
@@ -1238,7 +1219,7 @@ class Available(RecurringBehavior):
     """
 
     name = "AVAILABLE"
-    sort_first = ("uid", "recurrence-id", "dtstart", "duration", "dtend")
+    sort_first = ("UID", "RECURRENCE-ID", "DTSTART", "DURATION", "DTEND")
     description = "Defines a period of time in which a user is normally available."
     known_children = {
         "DTSTAMP": (1, 1, None),  # min, max, behavior_registry id
@@ -1280,9 +1261,7 @@ class Duration(Behavior):
 
     @staticmethod
     def transform_to_native(obj):
-        """
-        Turn obj.value into a dt.timedelta.
-        """
+        """Turn obj.value into a dt.timedelta."""
         if obj.is_native:
             return obj
         obj.is_native = True
@@ -1290,13 +1269,8 @@ class Duration(Behavior):
         if obj.value == "":
             return obj
 
-        deltalist = string_to_durations(obj.value)
-        # When can DURATION have multiple durations?  For now:
-        if len(deltalist) == 1:
-            obj.value = deltalist[0]
-            return obj
-
-        raise ParseError("DURATION must have a single duration string.")
+        obj.value = vtypes.Duration(obj.value).value
+        return obj
 
     @staticmethod
     def transform_from_native(obj):
@@ -1386,7 +1360,7 @@ class PeriodBehavior(Behavior):
             obj.value = []
             return obj
         tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
-        obj.value = [string_to_period(x, tzinfo) for x in obj.value.split(",")]
+        obj.value = [vtypes.Period(x, tzinfo).value for x in obj.value.split(",")]
         return obj
 
     @classmethod
@@ -1408,9 +1382,7 @@ class PeriodBehavior(Behavior):
 
 
 class FreeBusy(PeriodBehavior):
-    """
-    Free or busy period of time, must be specified in UTC.
-    """
+    """Free or busy period of time, must be specified in UTC."""
 
     name = "FREEBUSY"
     force_utc = True
@@ -1439,28 +1411,16 @@ list(map(lambda x: register_behavior(DateOrDateTimeBehavior, x), date_time_or_da
 register_behavior(MultiDateBehavior, "RDATE")
 register_behavior(MultiDateBehavior, "EXDATE")
 
+# fmt:off
 text_list = [
-    "CALSCALE",
-    "METHOD",
-    "PRODID",
-    "CLASS",
-    "COMMENT",
-    "DESCRIPTION",
-    "LOCATION",
-    "STATUS",
-    "SUMMARY",
-    "TRANSP",
-    "CONTACT",
-    "RELATED-TO",
-    "UID",
-    "ACTION",
-    "BUSYTYPE",
+    "ACTION", "BUSYTYPE", "CALSCALE", "CLASS", "COMMENT", "CONTACT", "DESCRIPTION", "LOCATION", "METHOD",
+    "PRODID", "RELATED-TO", "STATUS", "SUMMARY", "TRANSP", "UID",
 ]
+# fmt:on
 list(map(lambda x: register_behavior(TextBehavior, x), text_list))
 
 list(map(lambda x: register_behavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
 register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
-
 
 if __name__ == "__main__":
     print(TimezoneComponent().tzinfo.locals())

@@ -14,17 +14,16 @@ jobs:
   coverage-test: # Tests code for base version and coverage
     runs-on: windows-latest
     steps:
-      - uses: rsb-23/actions/checkout@main
-      - uses: ./.github/test-setup
+      - &checkout
+        uses: rsb-23/actions/checkout@main
+      - uses: &test-runner ./.github/test-runner
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
-
-      - name: Run tests with coverage and enforce minimum
-        run: pytest -x --cov --cov-report=xml
+          coverage: true
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.xml
@@ -33,23 +32,19 @@ jobs:
     needs: coverage-test
     runs-on: macos-latest
     steps:
-      - uses: rsb-23/actions/checkout@main
-      - uses: ./.github/test-setup
+      - *checkout
+      - uses: *test-runner
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
-      - name: Run Tests
-        run: pytest -x
 
   version-tests: # Tests code for higher version in ubuntu
     needs: coverage-test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
+        python-version: [ "3.11", "3.12", "3.13", "3.14" ]
     steps:
-      - uses: rsb-23/actions/checkout@main
-      - uses: ./.github/test-setup
+      - *checkout
+      - uses: *test-runner
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Run Tests
-        run: pytest -x
