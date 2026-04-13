@@ -127,4 +127,4 @@ def test_vcf_qp():
     )
     vcf = vo.read_one(vcf)
     assert vcf.n.value == Name(given="é")
-    assert vcf.serialize() == "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:é\r\nN:;é;;;\r\nTEL:0111111111\r\nEND:VCARD\r\n"
+    assert vcf.serialize() == "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:é\r\nN:;é;;;\r\nTEL;HOME:0111111111\r\nEND:VCARD\r\n"

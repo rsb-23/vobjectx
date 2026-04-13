@@ -187,15 +187,11 @@ class ContentLine(VBase):
     @ivar name:
         The uppercased name of the contentline.
     @ivar params:
-        A dictionary of parameters and associated lists of values (the list may
-        be empty for empty parameters).
+        A dictionary of parameters and associated lists of values.
+        Singleton params (e.g., WORK, CELL in vCard 2.1) are stored with an
+        empty list as the value.
     @ivar value:
         The value of the contentline.
-    @ivar singletonparams:
-        A list of parameters for which it's unclear if the string represents the
-        parameter name or the parameter value. In vCard 2.1, "The value string
-        can be specified alone in those cases where the value is unambiguous".
-        This is crazy, but we have to deal with it.
     @ivar encoded:
         A boolean describing whether the data in the content line is encoded.
         Generally, text read from a serialized vCard or vCalendar should be
@@ -218,16 +214,14 @@ class ContentLine(VBase):
         self.name = name.upper()
         self.encoded = encoded
         self.params = ContentDict()
-        self.singletonparams = []
         self.is_native = is_native
         self.line_number = line_number
         self.value: Any = value  # depends on Behavior
 
         def update_table(x):
-            if len(x) == 1:
-                self.singletonparams += x
-            else:
-                paramlist = self.params.setdefault(x[0].upper(), [])
+            # All params stored uniformly: singleton params get empty list
+            paramlist = self.params.setdefault(x[0], [])
+            if len(x) > 1:
                 paramlist.extend(x[1:])
 
         list(map(update_table, params))
@@ -238,9 +232,9 @@ class ContentLine(VBase):
             self.params["ENCODING"].remove("QUOTED-PRINTABLE")
             if not self.params["ENCODING"]:
                 del self.params["ENCODING"]
-        if "QUOTED-PRINTABLE" in self.singletonparams:
+        if "QUOTED-PRINTABLE" in self.params:
             qp = True
-            self.singletonparams.remove("QUOTED-PRINTABLE")
+            del self.params["QUOTED-PRINTABLE"]
         if qp:
             if "ENCODING" in self.params:
                 _encoding = self.params["ENCODING"]
@@ -269,7 +263,6 @@ class ContentLine(VBase):
         self.params = copy.copy(copyit.params)
         for k, v in self.params.items():
             self.params[k] = copy.copy(v)
-        self.singletonparams = copy.copy(copyit.singletonparams)
         self.line_number = copyit.line_number
 
     def __eq__(self, other):
@@ -325,11 +318,12 @@ class ContentLine(VBase):
             raise AttributeError(name) from e
 
     def value_repr(self):
-        """
-        Transform the representation of the value
-        according to the behavior, if any.
-        """
+        """Transform the representation of the value according to the behavior, if any."""
         return self.behavior.value_repr(self) if self.behavior else self.value
+
+    @property
+    def display_params(self):
+        return {k: v for k, v in self.params.items() if v}
 
     def __repr__(self):
         try:
@@ -337,10 +331,12 @@ class ContentLine(VBase):
         except UnicodeEncodeError:
             value_repr = self.value_repr().encode("utf-8")
 
-        return f"<{self.name}{self.params}{value_repr}>"
+        # Filter out singleton params (empty lists) for display
+        return f"<{self.name}{self.display_params}{value_repr}>"
 
     def __unicode__(self):
-        return f"<{self.name}{self.params}{self.value_repr()}>"
+        # Filter out singleton params (empty lists) for display
+        return f"<{self.name}{self.display_params}{self.value_repr()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -364,7 +360,10 @@ class ContentLine(VBase):
         for key in keys:
             paramstr = ",".join(dquote_escape(p) for p in self.params[key])
             try:
-                s.write(f";{key}={paramstr}")
+                if paramstr:
+                    s.write(f";{key}={paramstr}")
+                else:
+                    s.write(f";{key}")
             except (UnicodeDecodeError, UnicodeEncodeError):
                 s.write(f";{key}={paramstr.encode('utf-8')}")
         try:

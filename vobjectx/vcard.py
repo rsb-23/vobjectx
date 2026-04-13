@@ -103,8 +103,8 @@ class VCardTextBehavior(Behavior):
         ENCODING=b
         """
         if line.encoded:
-            if "BASE64" in line.singletonparams:
-                line.singletonparams.remove("BASE64")
+            if "BASE64" in line.params:
+                del line.params["BASE64"]
                 line.encoding_param = cls.base64string
             encoding = getattr(line, "encoding_param", None)
             if encoding:
@@ -115,9 +115,7 @@ class VCardTextBehavior(Behavior):
 
     @classmethod
     def encode(cls, line):
-        """
-        Backslash escape line.value.
-        """
+        """Backslash escape line.value."""
         if not line.encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
