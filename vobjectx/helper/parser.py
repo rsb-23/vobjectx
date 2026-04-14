@@ -1,143 +1,87 @@
 import datetime as dt
+from dataclasses import dataclass
 
-from vobjectx.exceptions import warn_if_true
+from dateutil.tz import gettz
 
 from .constants_tmp import TRANSITIONS
-from .imports_ import Callable, Iterator, contextlib
+from .imports_ import Callable, Iterator
+from .time_funcs import get_tzid
 
 CheckFunc = Callable[[dt.datetime], bool]
 DateIter = Iterator[dt.datetime]
+
+EPOCH = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+
+
+@dataclass
+class Transition:
+    transition_dt: dt.datetime
+    offset: int
+    is_standard: bool
+
+    def __eq__(self, other) -> bool:
+        return self.transition_dt == other.transition_dt and self.offset == other.offset
+
+
+def get_transistions(tzinfo: dt.tzinfo, start_year=1900, end_year=2030) -> list[Transition]:
+    new_year = dt.datetime(end_year, 1, 1)
+    _tzid = get_tzid(tzinfo)
+    if _tzid in ("UTC", None):
+        return [Transition(new_year, 0, True)]
+
+    _tz = gettz(_tzid)
+    if _tz is None:
+        return [Transition(new_year, 1, True)]
+    transistions = []
+
+    for ts, idx in zip(_tz._trans_list, _tz._trans_idx):  # pylint: disable=protected-access
+        transistion_date = EPOCH + dt.timedelta(seconds=ts)
+        if start_year <= transistion_date.year <= end_year:
+            # Use dstoffset to determine if this is standard time
+            # dstoffset=0 means standard time, dstoffset>0 means daylight time
+            is_standard = idx.dstoffset == dt.timedelta(0)
+            transistions.append(Transition(transistion_date, offset=idx.offset, is_standard=is_standard))
+
+    return transistions
 
 
 def get_transition(transition_to: str, year: int, tzinfo: dt.tzinfo) -> dt.datetime | None:
     """
     Return the datetime of the transition to/from DST, or None.
+
+    Returns the transition time as a naive datetime in local wall-clock time,
+    typically at 2:00 AM for most timezones.
     """
     assert transition_to in TRANSITIONS
 
-    def first_transition(iter_dates: DateIter, test_func: CheckFunc) -> dt.datetime | None:
-        """
-        Return the last date not matching test, or None if all tests matched.
-        """
-        success = None
-        for _dt in iter_dates:
-            if not test_func(_dt):
-                success = _dt
-            else:
-                if success is not None:
-                    return success
-        return success
+    # Get transitions for the specified year
+    transitions = get_transistions(tzinfo, start_year=year, end_year=year)
 
-    def generate_dates(year_: int, month_: int = None, day_: int = None) -> DateIter:
-        """
-        Iterate over possible dates with unspecified values.
-        """
-        months = range(1, 13)
-        days = range(1, 32)
-        hours = range(24)
-        if month_ is None:
-            for _month in months:
-                yield dt.datetime(year_, _month, 1)
-        elif day_ is None:
-            for _day in days:
-                with contextlib.suppress(ValueError):
-                    yield dt.datetime(year_, month_, _day)
-        else:
-            for hour in hours:
-                yield dt.datetime(year_, month_, day_, hour)
+    # Filter transitions based on the requested type
+    for trans in transitions:
+        is_standard = trans.is_standard
+        if (transition_to == "standard" and is_standard) or (transition_to == "daylight" and not is_standard):
+            # Use the UTC transition date directly, since transitions occur at
+            # a specific instant that corresponds to 2:00 AM local time
+            utc_dt = trans.transition_dt
+            return dt.datetime(utc_dt.year, utc_dt.month, utc_dt.day, 2, 0, 0)
 
-    def test(dt_: dt.datetime) -> bool:
-        is_standard_transition = transition_to == "standard"
-        is_daylight_transition = not is_standard_transition
-
-        # Detect Ambiguity (Overlap)
-        if tzinfo.dst(dt_.replace(fold=0)) != tzinfo.dst(dt_.replace(fold=1)):
-            return is_standard_transition
-
-        # Detect Gap (Non-existent)
-        dt_no_tz = dt_.replace(tzinfo=None)
-
-        offset = tzinfo.utcoffset(dt_.replace(fold=0))
-        if offset is not None:
-            dt_utc = (dt_no_tz - offset).replace(tzinfo=dt.timezone.utc)
-            dt_back = dt_utc.astimezone(tzinfo)
-            if dt_back.replace(tzinfo=None) != dt_no_tz:
-                return is_daylight_transition
-
-        is_dt_zerodelta = tzinfo.dst(dt_) == dt.timedelta(0)
-        return is_dt_zerodelta if is_standard_transition else not is_dt_zerodelta
-
-    month_dt = first_transition(generate_dates(year), test)
-    if month_dt is None:
-        return dt.datetime(year, 1, 1)  # new year
-    if month_dt.month == 12:
-        return None
-
-    # there was a good transition somewhere in a non-December month
-    month = month_dt.month
-    day = first_transition(generate_dates(year, month), test).day
-    uncorrected = first_transition(generate_dates(year, month, day), test)
-    warn_if_true(uncorrected is None)
-    if transition_to == "standard":
-        # assuming tzinfo.dst returns a new offset for the first possible hour, we need to add one hour for the
-        # offset change and another hour because first_transition returns the hour before the transition
-        return uncorrected + dt.timedelta(hours=2)
-
-    # Detect Gap (Non-existent) at uncorrected + 1 hour
-    # Note: first_transition for daylight returns the hour before it becomes daylight.
-    # In zoneinfo, this uncorrected+1 might already be 03:00 if 02:00 was skipped.
-    check_dt = uncorrected + dt.timedelta(hours=1)
-    is_gap = False
-
-    # Check if uncorrected + 1 hour is a non-existent time
-    # In zoneinfo, if check_dt was 02:00, and 02:00 is skipped,
-    # it might already show up as something else or we can check with fold.
-    # A better way to detect gap is to see if fold=0 and fold=1 result in same UTC but different wall clock
-    # OR just check if it was supposed to be uncorrected + 1 but the library moved it.
-
-    # If we are looking for daylight transition, we expect the offset to change.
-    tzinfo.utcoffset(check_dt.replace(fold=0))
-    tzinfo.utcoffset(check_dt.replace(fold=1))
-
-    # For a gap (Spring forward), fold=0 and fold=1 usually return the same (the 'after' offset)
-    # but we can detect it by checking if it's "imaginary"
-    dt_no_tz = check_dt.replace(tzinfo=None)
-    # Use an offset that we know existed just before
-    prev_offset = tzinfo.utcoffset((check_dt - dt.timedelta(hours=1)).replace(fold=0))
-    dt_utc_supposed = (dt_no_tz - prev_offset).replace(tzinfo=dt.timezone.utc)
-    dt_actual = dt_utc_supposed.astimezone(tzinfo)
-    if dt_actual.replace(tzinfo=None) != dt_no_tz:
-        is_gap = True
-
-    # For daylight (Spring forward), if it's a gap, pytz used to return the start of the gap.
-    # zoneinfo's get_transition logic (via fold) might find the end of the gap.
-    # If we found a gap, return the hour before the gap ends (which is the hour it starts).
-    if is_gap:
-        return check_dt - dt.timedelta(hours=1)
-
-    return check_dt
+    # No transition found
+    return None
 
 
-def tzinfo_eq(tzinfo1: dt.tzinfo, tzinfo2: dt.tzinfo, start_year: int = 2000, end_year: int = 2020) -> bool:
-    """
-    Compare offsets and DST transitions from start_year to end_year.
-    """
+def tzinfo_eq(tzinfo1: dt.tzinfo, tzinfo2: dt.tzinfo, start_year: int = 1950, end_year: int = 2030) -> bool:
+    """Compare offsets and DST transitions from start_year to end_year."""
     if tzinfo1 == tzinfo2:
         return True
     if tzinfo1 is None or tzinfo2 is None:
         return False
 
-    def dt_test(_dt):
-        if _dt is None:
-            return True
-        return tzinfo1.utcoffset(_dt) == tzinfo2.utcoffset(_dt)
+    t1_transitions = get_transistions(tzinfo1, start_year, end_year)
+    t2_transitions = get_transistions(tzinfo2, start_year, end_year)
 
-    if not dt_test(dt.datetime(start_year, 1, 1)):
-        return False
-    for year in range(start_year, end_year):
-        for transition_to in TRANSITIONS:
-            t1 = get_transition(transition_to, year, tzinfo1)
-            t2 = get_transition(transition_to, year, tzinfo2)
-            if t1 != t2 or not dt_test(t1):
-                return False
+    for t1, t2 in zip(t1_transitions, t2_transitions):
+        if t1 != t2:
+            return False
+
     return True

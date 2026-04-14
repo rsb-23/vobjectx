@@ -17,3 +17,11 @@ def split_delta(delta: dt.timedelta) -> SimpleDelta:
     hours, seconds = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
     return SimpleDelta(days=delta.days, hours=hours, minutes=minutes, seconds=seconds)
+
+
+def get_tzid(tzinfo) -> str | None:
+    for attr in ("key", "_tzid", "zone", "tzid"):
+        tzid_ = getattr(tzinfo, attr, None)
+        if tzid_:
+            return tzid_
+    return None
