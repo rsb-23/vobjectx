@@ -4,11 +4,13 @@ import zoneinfo
 from random import sample
 
 import dateutil
+import pytest
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
 
 from vobjectx import base
 from vobjectx.behavior import new_from_behavior
 from vobjectx.datatypes import Period
+from vobjectx.exceptions import ValidateError
 from vobjectx.icalendar import (
     RecurringComponent,
     TimezoneComponent,
@@ -265,3 +267,48 @@ def test_issue50():
     test_file = get_test_file("vobject_0050.ics")
     cal = base.read_one(test_file)
     assert dt.datetime(2024, 8, 12, 22, 30, tzinfo=UTC_TZ) == cal.vevent.dtend.value
+
+
+def test_vevent_dtstart_recurrence_id_type_mismatch():
+    """
+    Test that VEVENT validation fails when DTSTART and RECURRENCE-ID have different types.
+
+    DTSTART and RECURRENCE-ID must both be either datetime.date or datetime.datetime objects.
+    This test verifies the validation logic catches type mismatches.
+    """
+    # TODO: may simplify into simple test after redesign
+    # Create a VEVENT with DTSTART as datetime and RECURRENCE-ID as date (should fail)
+    vevent = new_from_behavior("VEVENT")
+    vevent.add("dtstart").value = dt.datetime(2024, 1, 15, 10, 0)
+    vevent.add("dtstamp").value = dt.datetime(2024, 1, 15, 10, 0)
+    vevent.add("recurrence_id").value = dt.date(2024, 1, 22)
+    vevent.add("uid").value = "dfvbdfvbdfljb"
+
+    # Validation should raise a ValidateError
+    with pytest.raises(ValidateError, match="RECURRENCE-ID and DTSTART must be of same type"):
+        vevent.validate(raise_exception=True)
+
+    # Create a VEVENT with DTSTART as date and RECURRENCE-ID as datetime (should fail)
+    vevent2 = new_from_behavior("VEVENT")
+    vevent2.add("dtstart").value = dt.date(2024, 1, 15)
+    vevent2.add("recurrence_id").value = dt.datetime(2024, 1, 22, 10, 0)
+
+    # Validation should raise a ValidateError
+    with pytest.raises(ValidateError, match="RECURRENCE-ID and DTSTART must be of same type"):
+        vevent2.validate()
+
+    # Create a VEVENT with both as datetime (should pass)
+    # vevent3 = new_from_behavior("VEVENT")
+    vevent.dtstart.value = dt.datetime(2024, 1, 15, 10, 0)
+    vevent.recurrence_id.value = dt.datetime(2024, 1, 22, 10, 0)
+
+    # Validation should pass
+    vevent.validate()
+
+    # Create a VEVENT with both as date (should pass)
+    vevent4 = new_from_behavior("VEVENT")
+    vevent4.add("dtstart").value = dt.date(2024, 1, 15)
+    vevent4.add("recurrence_id").value = dt.date(2024, 1, 22)
+
+    # Validation should pass
+    vevent4.validate()
