@@ -581,6 +581,13 @@ class RecurringBehavior(VCalendarComponentBehavior):
             now = dt.datetime.now(UTC_TZ)
             obj.add("dtstamp").value = now
 
+    @classmethod
+    def validate(cls, obj, raise_exception=True, complain_unrecognized=False):
+        if hasattr(obj, "recurrence_id") and hasattr(obj, "dtstart"):
+            if type(obj.dtstart.value) is not type(obj.recurrence_id.value):
+                raise ValidateError("RECURRENCE-ID and DTSTART must be of same type")
+        return super().validate(obj, raise_exception, complain_unrecognized)
+
 
 class DateTimeBehavior(Behavior):
     """

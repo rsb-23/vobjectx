@@ -12,3 +12,5 @@ venv/
 *coverage*
 
 new/
+AGENTS.md
+QWEN.md
