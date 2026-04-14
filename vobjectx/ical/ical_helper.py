@@ -1,6 +1,8 @@
 import datetime as dt
 import math
 
+from dateutil.relativedelta import relativedelta
+
 from vobjectx import datatypes as vtypes
 from vobjectx.exceptions import ParseError
 from vobjectx.registry import TzidRegistry
@@ -15,10 +17,9 @@ def date_to_datetime_(dt_obj: dt.datetime | dt.date) -> dt.datetime:
 
 
 def from_last_week_(dt_: dt.datetime) -> int:
-    """
-    How many weeks from the end of the month dt is, starting from 1.
-    """
-    next_month = dt.datetime(dt_.year, dt_.month + 1, 1)
+    """How many weeks from the end of the month dt is, starting from 1."""
+
+    next_month = dt.datetime(dt_.year, dt_.month, 1) + relativedelta(months=1)
     time_diff = next_month - dt_
     days_gap = time_diff.days + bool(time_diff.seconds)
     return math.ceil(days_gap / 7)

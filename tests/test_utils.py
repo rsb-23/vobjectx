@@ -1,5 +1,6 @@
 import datetime as dt
 from io import StringIO
+from zoneinfo import ZoneInfo
 
 from dateutil.tz import tzutc
 
@@ -20,9 +21,11 @@ def test_date_to_string():
 
 
 def test_datetime_to_string():
+    tz_0_offset = ZoneInfo("Africa/Dakar")
     tc = {
         (dt.datetime(2000, 10, 29, 3, 0), False): "20001029T030000",
         (dt.datetime(2007, 3, 13, 12, 34, 32, tzinfo=tzutc()), True): "20070313T123432Z",
+        (dt.datetime(2000, 10, 29, 3, 0, tzinfo=tz_0_offset), False): "20001029T030000Z",
     }
     for inp, out in tc.items():
         assert datetime_to_string(*inp) == out
