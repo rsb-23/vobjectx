@@ -6,7 +6,7 @@ from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import Any, TextIO, contextlib, copy, sys
+from .helper.imports_ import Any, Self, TextIO, contextlib, copy, sys
 from .patterns import patterns
 from .registry import BehaviorRegistry
 
@@ -39,7 +39,7 @@ class VBase:
         self.is_native = False
         self.encoded = False
 
-    def copy(self, copyit):
+    def copy(self, copyit: Self):
         self.group = copyit.group
         self.behavior = copyit.behavior
         self.parent_behavior = copyit.parent_behavior
@@ -202,7 +202,16 @@ class ContentLine(VBase):
 
     # pylint: disable=r0902,r0917
     def __init__(
-        self, name, params, value, group=None, encoded=False, is_native=False, line_number=None, *args, **kwds
+        self,
+        name: str,
+        params,
+        value,
+        group=None,
+        encoded: bool = False,
+        is_native: bool = False,
+        line_number: int = None,
+        *args,
+        **kwds,
     ):
         """
         Take output from parse_line, convert params list to dictionary.
@@ -255,11 +264,11 @@ class ContentLine(VBase):
         newcopy.copy(copyit)
         return newcopy
 
-    def copy(self, copyit):
+    def copy(self, copyit: Self):
         super().copy(copyit)
         self.name = copyit.name
         self.value = copy.copy(copyit.value)
-        self.encoded = self.encoded
+        self.encoded = copyit.encoded
         self.params = copy.copy(copyit.params)
         for k, v in self.params.items():
             self.params[k] = copy.copy(v)
@@ -374,6 +383,12 @@ class ContentLine(VBase):
             self.behavior.decode(self)
         fold_one_line(outbuf, s.getvalue(), line_length)
 
+    # pylint: disable=w0613
+    @classmethod
+    def line_validate(cls, line, raise_exception=True, complain_unrecognized=False):
+        """Examine a line's parameters and values, return True if valid."""
+        return True
+
 
 class Component(VBase):
     """
@@ -407,7 +422,7 @@ class Component(VBase):
         newcopy.copy(copyit)
         return newcopy
 
-    def copy(self, copyit):
+    def copy(self, copyit: Self):
         super().copy(copyit)
 
         # deep copy of contents
@@ -626,14 +641,13 @@ def parse_params(string):
     """
     _all = params_re.findall(string)
     all_parameters = []
-    for tup in _all:
-        param_list = [tup[0]]  # tup looks like (name, values_string)
-        for pair in param_values_re.findall(tup[1]):
+    for param in _all:
+        name, values_string = param
+        param_list = [name]
+        for pair in param_values_re.findall(values_string):
             # pair looks like ('', value) or (value, '')
-            if pair[0] != "":
-                param_list.append(pair[0])
-            else:
-                param_list.append(pair[1])
+            param_list.append(pair[0] or pair[1])
+
         all_parameters.append(param_list)
     return all_parameters
 
@@ -722,10 +736,9 @@ def text_line_to_content_line(text, n=None):
     return ContentLine(*parse_line(text, n), **{"encoded": True, "line_number": n})
 
 
-def dquote_escape(param) -> str:
-    """
-    Return param, or "param" if ',' or ';' or ':' is in param.
-    """
+def dquote_escape(param: str) -> str:
+    """Return param, or "param" if ',' or ';' or ':' is in param."""
+
     if '"' in param:
         raise VObjectError("Double quotes aren't allowed in parameter values.")
     for char in ",;:":  # sourcery skip # temp
