@@ -37,9 +37,14 @@ class VBase:
         self.behavior = None
         self.parent_behavior = None
         self.is_native = False
-        self.encoded = False
+        self.is_encoded = False
 
-    def copy(self, copyit: Self):
+    def copy(self) -> Self:
+        newcopy = type(self)()
+        newcopy.upgrade_from(self)
+        return newcopy  # type: ignore
+
+    def upgrade_from(self, copyit: Self):
         self.group = copyit.group
         self.behavior = copyit.behavior
         self.parent_behavior = copyit.parent_behavior
@@ -79,11 +84,11 @@ class VBase:
                 behavior = BehaviorRegistry.get(self.name, known_child_tup[2])
                 if behavior is not None:
                     self.set_behavior(behavior, cascade)
-                    if isinstance(self, ContentLine) and self.encoded:
+                    if isinstance(self, ContentLine) and self.is_encoded:
                         self.behavior.decode(self)
             elif isinstance(self, ContentLine):
                 self.behavior = parent_behavior.default_behavior
-                if self.encoded and self.behavior:
+                if self.is_encoded and self.behavior:
                     self.behavior.decode(self)
 
     def set_behavior(self, behavior, cascade=True):
@@ -107,7 +112,7 @@ class VBase:
         if self.is_native or not self.behavior or not self.behavior.has_native:
             return self
 
-        self_orig = copy.copy(self)
+        self_orig = self.copy()
         try:
             return self.behavior.transform_to_native(self)
         except ParseError as e:
@@ -204,10 +209,10 @@ class ContentLine(VBase):
     def __init__(
         self,
         name: str,
-        params,
-        value,
+        params: list,
+        value: str,
         group=None,
-        encoded: bool = False,
+        is_encoded: bool = False,
         is_native: bool = False,
         line_number: int = None,
         *args,
@@ -221,7 +226,7 @@ class ContentLine(VBase):
         super().__init__(group, *args, **kwds)
 
         self.name = name.upper()
-        self.encoded = encoded
+        self.is_encoded = is_encoded
         self.params = ContentDict()
         self.is_native = is_native
         self.line_number = line_number
@@ -258,19 +263,18 @@ class ContentLine(VBase):
             except UnicodeDecodeError:
                 self.value = _value.decode("latin-1")
 
-    @classmethod
-    def duplicate(cls, copyit):
-        newcopy = cls("", {}, "")
-        newcopy.copy(copyit)
-        return newcopy
+    def copy(self) -> Self:
+        newcopy = ContentLine("", [], "")
+        newcopy.update_from(self)
+        return newcopy  # type: ignore
 
-    def copy(self, copyit: Self):
-        super().copy(copyit)
+    def update_from(self, copyit: Self):
+        super().upgrade_from(copyit)
         self.name = copyit.name
         self.value = copy.copy(copyit.value)
-        self.encoded = copyit.encoded
-        self.params = copy.copy(copyit.params)
-        for k, v in self.params.items():
+        self.is_encoded = copyit.is_encoded
+
+        for k, v in copyit.params.items():
             self.params[k] = copy.copy(v)
         self.line_number = copyit.line_number
 
@@ -352,11 +356,11 @@ class ContentLine(VBase):
         print(pre, f"{self.name}:", self.value_repr())
         if self.params:
             print(pre, "params for ", f"{self.name}:")
-            for k in self.params.keys():
-                print(pre + " " * tabwidth, k, self.params[k])
+            for k, v in self.params.items():
+                print(pre + " " * tabwidth, k, v)
 
     def default_serialize(self, outbuf, line_length):
-        started_encoded = self.encoded
+        started_encoded = self.is_encoded
         if self.behavior and not started_encoded:
             self.behavior.encode(self)
 
@@ -416,21 +420,15 @@ class Component(VBase):
         self.use_begin = bool(name)
         self.auto_behavior()
 
-    @classmethod
-    def duplicate(cls, copyit):
-        newcopy = cls()
-        newcopy.copy(copyit)
-        return newcopy
-
-    def copy(self, copyit: Self):
-        super().copy(copyit)
+    def upgrade_from(self, copyit: Self):
+        super().upgrade_from(copyit)
 
         # deep copy of contents
         self.contents = ContentDict()
         for key, lvalue in copyit.contents.items():
             newvalue = []
             for value in lvalue:
-                newitem = value.duplicate(value)
+                newitem = value.copy()
                 newvalue.append(newitem)
             self.contents[key] = newvalue
 
@@ -733,7 +731,7 @@ def get_logical_lines(fp, allow_qp=True):
 
 
 def text_line_to_content_line(text, n=None):
-    return ContentLine(*parse_line(text, n), **{"encoded": True, "line_number": n})
+    return ContentLine(*parse_line(text, n), **{"is_encoded": True, "line_number": n})
 
 
 def dquote_escape(param: str) -> str:

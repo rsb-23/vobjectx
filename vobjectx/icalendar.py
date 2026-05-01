@@ -515,24 +515,24 @@ class TextBehavior(Behavior):
     @classmethod
     def decode(cls, line):
         """Remove backslash escaping from line.value."""
-        if line.encoded:
+        if line.is_encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
                 line.value = base64.b64decode(line.value)
             else:
                 line.value = string_to_text_values(line.value)[0]
-            line.encoded = False
+            line.is_encoded = False
 
     @classmethod
     def encode(cls, line: VBase):
         """Backslash escape line.value."""
-        if not line.encoded:
+        if not line.is_encoded:
             encoding = getattr(line, "encoding_param", None)
             if encoding and encoding.upper() == cls.base64string:
                 line.value = base64.b64encode(line.value.encode("utf-8")).decode("utf-8").replace("\n", "")
             else:
                 line.value = backslash_escape(line.value)
-            line.encoded = True
+            line.is_encoded = True
 
 
 class VCalendarComponentBehavior(Behavior):
@@ -751,18 +751,18 @@ class MultiTextBehavior(Behavior):
         """
         Remove backslash escaping from line.value, then split on commas.
         """
-        if line.encoded:
+        if line.is_encoded:
             line.value = string_to_text_values(line.value, list_separator=cls.list_separator)
-            line.encoded = False
+            line.is_encoded = False
 
     @classmethod
     def encode(cls, line):
         """
         Backslash escape line.value.
         """
-        if not line.encoded:
+        if not line.is_encoded:
             line.value = cls.list_separator.join(backslash_escape(val) for val in line.value)
-            line.encoded = True
+            line.is_encoded = True
 
 
 class SemicolonMultiTextBehavior(MultiTextBehavior):
