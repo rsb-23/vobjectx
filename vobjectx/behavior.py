@@ -78,8 +78,10 @@ class Behavior:
         """
         if not cls.allow_group and obj.group is not None:
             raise VObjectError(f"{obj} has a group, but this object doesn't support groups")
+
         if isinstance(obj, ContentLine):
-            return cls.line_validate(obj, raise_exception, complain_unrecognized)
+            return obj.line_validate(obj, raise_exception, complain_unrecognized)
+
         if isinstance(obj, Component):
             count = {}
             for child in obj.get_children():
@@ -102,22 +104,12 @@ class Behavior:
         raise VObjectError(f"{obj} is not a Component or Contentline")
 
     @classmethod
-    def line_validate(cls, line, raise_exception, complain_unrecognized):
-        """Examine a line's parameters and values, return True if valid."""
-        # TODO: remove used param line, raise_exception, complain_unrecognized
-        if any([line, raise_exception, complain_unrecognized]):
-            pass
-        return True
-
-    @classmethod
     def decode(cls, line):
-        if line.encoded:
-            line.encoded = 0
+        line.encoded = False
 
     @classmethod
     def encode(cls, line):
-        if not line.encoded:
-            line.encoded = 1
+        line.encoded = True
 
     @staticmethod
     def transform_to_native(obj):

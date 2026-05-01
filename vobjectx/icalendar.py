@@ -9,7 +9,7 @@ from dateutil import rrule, tz
 
 from . import datatypes as vtypes
 from .__about__ import __version__ as VERSION
-from .base import Component, ContentLine, fold_one_line
+from .base import Component, ContentLine, VBase, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
 from .helper import backslash_escape, get_buffer, get_random_int, logger
@@ -524,7 +524,7 @@ class TextBehavior(Behavior):
             line.encoded = False
 
     @classmethod
-    def encode(cls, line):
+    def encode(cls, line: VBase):
         """Backslash escape line.value."""
         if not line.encoded:
             encoding = getattr(line, "encoding_param", None)
@@ -610,7 +610,7 @@ class DateTimeBehavior(Behavior):
         obj.is_native = True
         if obj.value == "":
             return obj
-        obj.value = obj.value
+
         # we're cheating a little here, parse_dtstart allows DATE
         obj.value = parse_dtstart(obj)
         if obj.value.tzinfo is None:
@@ -662,7 +662,7 @@ class DateOrDateTimeBehavior(Behavior):
         obj.is_native = True
         if obj.value == "":
             return obj
-        obj.value = obj.value
+
         obj.value = parse_dtstart(obj, allow_signature_mismatch=True)
         if getattr(obj, "value_param", "DATE-TIME").upper() == "DATE-TIME" and hasattr(obj, "tzid_param"):
             # Keep a copy of the original TZID around
@@ -1005,11 +1005,11 @@ class VEvent(RecurringBehavior):
 
     @classmethod
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
-        if "dtend" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, complain_unrecognized)
-        if raise_exception:
-            raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
-        return False
+        if "dtend" in obj.contents and "duration" in obj.contents:
+            if raise_exception:
+                raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
+            return False
+        return super().validate(obj, raise_exception, complain_unrecognized)
 
 
 register_behavior(VEvent)
@@ -1060,11 +1060,11 @@ class VTodo(RecurringBehavior):
 
     @classmethod
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
-        if "due" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, complain_unrecognized)
-        if raise_exception:
-            raise ValidateError("VTODO components cannot contain both DUE and DURATION components")
-        return False
+        if "due" in obj.contents and "duration" in obj.contents:
+            if raise_exception:
+                raise ValidateError("VTODO components cannot contain both DUE and DURATION components")
+            return False
+        return super().validate(obj, raise_exception, complain_unrecognized)
 
 
 register_behavior(VTodo)
@@ -1210,11 +1210,11 @@ class VAvailability(VCalendarComponentBehavior):
 
     @classmethod
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
-        if "dtend" not in obj.contents or "duration" not in obj.contents:
-            return super().validate(obj, raise_exception, complain_unrecognized)
-        if raise_exception:
-            raise ValidateError("VAVAILABILITY components cannot contain both DTEND and DURATION components")
-        return False
+        if "dtend" in obj.contents and "duration" in obj.contents:
+            if raise_exception:
+                raise ValidateError("VAVAILABILITY components cannot contain both DTEND and DURATION components")
+            return False
+        return super().validate(obj, raise_exception, complain_unrecognized)
 
 
 register_behavior(VAvailability)
@@ -1272,7 +1272,7 @@ class Duration(Behavior):
         if obj.is_native:
             return obj
         obj.is_native = True
-        obj.value = obj.value
+
         if obj.value == "":
             return obj
 
