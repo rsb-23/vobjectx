@@ -105,11 +105,11 @@ class Behavior:
 
     @classmethod
     def decode(cls, line):
-        line.encoded = False
+        line.is_encoded = False
 
     @classmethod
     def encode(cls, line):
-        line.encoded = True
+        line.is_encoded = True
 
     @staticmethod
     def transform_to_native(obj):
