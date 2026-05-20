@@ -6,7 +6,7 @@ from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import Any, Self, TextIO, contextlib, copy, sys
+from .helper.imports_ import Any, Iterator, Self, TextIO, contextlib, copy, sys
 from .patterns import patterns
 from .registry import BehaviorRegistry
 
@@ -666,7 +666,7 @@ def parse_line(line, line_number=None):
     )
 
 
-def get_logical_lines(fp, allow_qp=True):
+def get_logical_lines(fp: TextIO, allow_qp: bool = True) -> Iterator:
     """
     Iterate through a stream, yielding one logical line at a time.
 
@@ -677,6 +677,10 @@ def get_logical_lines(fp, allow_qp=True):
 
     Quoted-printable data will be decoded in the Behavior decoding phase.
     """
+
+    def get_value(lines: list[str]):
+        return "".join(lines)
+
     if not allow_qp:
         val = fp.read(-1)
 
@@ -689,45 +693,40 @@ def get_logical_lines(fp, allow_qp=True):
         return
 
     quoted_printable = False
-    logical_line = get_buffer()
-    line_number = 0
+    logical_line: list[str] = []
     line_start_number = 0
-    while True:
-        line = fp.readline()
-        if line == "":
-            break
+
+    for n, line in enumerate(fp, start=1):
         line = line.rstrip(Char.CRLF)
-        line_number += 1
 
         if line.rstrip() == "":
-            if logical_line.tell() > 0:
-                yield logical_line.getvalue(), line_start_number
-            line_start_number = line_number
-            logical_line = get_buffer()
+            if logical_line:
+                yield get_value(logical_line), line_start_number
+            line_start_number = n
+            logical_line = []
             quoted_printable = False
             continue
 
         if quoted_printable and allow_qp:
-            logical_line.write("\n")
+            logical_line.append("\n")
             quoted_printable = False
         elif line[0] in Char.SPACEORTAB:
             line = line[1:]
-        elif logical_line.tell() > 0:
-            yield logical_line.getvalue(), line_start_number
-            line_start_number = line_number
-            logical_line = get_buffer()
+        elif logical_line:
+            yield get_value(logical_line), line_start_number
+            line_start_number = n
+            logical_line = []
         else:
-            logical_line = get_buffer()
-        logical_line.write(line)
+            logical_line = []
+        logical_line.append(line)
 
         # vCard 2.1 allows parameters to be encoded without a parameter name
         # False positives are unlikely, but possible.
-        val = logical_line.getvalue()
-        if val[-1] == "=" and val.lower().find("quoted-printable") >= 0:
+        if line[-1] == "=" and "quoted-printable" in get_value(logical_line).lower():
             quoted_printable = True
 
-    if logical_line.tell() > 0:
-        yield logical_line.getvalue(), line_start_number
+    if logical_line:
+        yield get_value(logical_line), line_start_number
 
 
 def text_line_to_content_line(text, n=None):
@@ -765,10 +764,10 @@ def default_serialize(obj, buf, line_length):
     return buf or outbuf.getvalue()
 
 
-def read_components(stream_or_string, validate=False, transform=True, ignore_unreadable=False, allow_qp=False):
-    """
-    Generate one Component at a time from a stream.
-    """
+def read_components(
+    stream_or_string, validate=False, transform=True, ignore_unreadable=False, allow_qp=False
+) -> Iterator[Component]:
+    """Generate one Component at a time from a stream."""
 
     def raise_parse_error(msg):
         raise ParseError(msg, n, inputs=stream_or_string)

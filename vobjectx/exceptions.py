@@ -3,13 +3,21 @@ import warnings
 
 class VObjectError(Exception):
     def __init__(self, msg, line_number=None):
-        self.msg = msg
+        super().__init__(msg)
         self.line_number = line_number
+        self.__notes__ = []
+
+    def add_note(self, note):
+        # TODO: remove this for 3.10 deprecation
+        self.__notes__.append(note)
 
     def __str__(self):
-        if self.line_number is None:
-            return repr(self.msg)
-        return f"At line {self.line_number!s}: {self.msg!s}"
+        msg = self.args[0]
+        if self.line_number is not None:
+            msg = f"At line {self.line_number}: {msg}"
+        if self.__notes__:
+            msg += "\n" + "\n".join(self.__notes__)
+        return msg
 
 
 class ParseError(VObjectError):
@@ -32,7 +40,8 @@ class AllException(VObjectError):
 
 class UnusedBranchError(VObjectError):
     def __init__(self):
-        super().__init__("Unexpected Execution : Report a bug", None)
+        super().__init__("Unused Branch Error", None)
+        super().add_note("Unexpected Execution : Report a bug")
 
 
 def warn_if_true(cond: bool = True, raise_error: bool = True):
