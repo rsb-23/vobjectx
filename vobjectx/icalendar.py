@@ -1137,9 +1137,7 @@ register_behavior(VFreeBusy)
 
 
 class VAlarm(VCalendarComponentBehavior):
-    """
-    Alarm behavior.
-    """
+    """Alarm behavior"""
 
     name = "VALARM"
     description = "Alarms describe when and how to provide alerts about events and to-dos."
@@ -1153,9 +1151,7 @@ class VAlarm(VCalendarComponentBehavior):
 
     @staticmethod
     def generate_implicit_parameters(obj):
-        """
-        Create default ACTION and TRIGGER if they're not set.
-        """
+        """Create default ACTION and TRIGGER if they're not set."""
         if not hasattr(obj, "action"):
             obj.add("action").value = "AUDIO"
 
@@ -1163,17 +1159,34 @@ class VAlarm(VCalendarComponentBehavior):
             obj.add("trigger").value = dt.timedelta(0)
 
     @classmethod
-    def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
-        """
-        # TODO
-        if obj.contents.has_key('dtend') and obj.contents.has_key('duration'):
+    def validate(cls, obj, raise_exception: bool = True, complain_unrecognized: bool = False) -> bool:
+        contents = obj.contents
+
+        def fail(msg):
             if raise_exception:
-                raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
+                raise ValidateError(msg)
             return False
-        else:
-            return super().validate(obj, raise_exception, *args)
-        """
-        return True
+
+        action = contents.action[0].value
+
+        # REPEAT and DURATION must appear together
+        if ("duration" in contents) ^ ("repeat" in contents):
+            return fail("VALARM DURATION and REPEAT must both be present/absent.")
+
+        if action == "DISPLAY":
+            if "description" not in contents:
+                return fail("DISPLAY VALARM missing DESCRIPTION")
+
+        elif action == "EMAIL":
+            for prop in ("description", "summary", "attendee"):
+                if prop not in contents:
+                    return fail(f"EMAIL VALARM missing {prop.upper()}")
+
+        elif action == "AUDIO":
+            if len(contents.get("attach", [])) > 1:
+                return fail("AUDIO VALARM can contain only one ATTACH")
+
+        return super().validate(obj, raise_exception, complain_unrecognized)
 
 
 register_behavior(VAlarm)
