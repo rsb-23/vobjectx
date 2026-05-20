@@ -2,7 +2,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class SimpleDelta:
     days: int
     hours: int

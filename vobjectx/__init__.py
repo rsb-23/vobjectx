@@ -95,4 +95,4 @@ def vCard():  # pylint:disable=invalid-name
     return new_from_behavior("vcard", "3.0")
 
 
-__all__ = ["icalendar", "vcard", "read_components", "read_one", "new_from_behavior", "iCalendar", "vCard"]
+__all__ = ["icalendar", "vcard", "read_components", "read_one", "new_from_behavior", "iCalendar", "vCard", "VERSION"]

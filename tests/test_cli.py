@@ -1,9 +1,7 @@
 import subprocess
-from dataclasses import dataclass
 
 
-@dataclass
-class Cli:
+class Cli:  # pylint: disable=r0903
     ics_diff = "ics_diff"
     change_tz = "change_tz"
 

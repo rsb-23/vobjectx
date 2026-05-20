@@ -13,7 +13,7 @@ DateIter = Iterator[dt.datetime]
 EPOCH = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Transition:
     transition_dt: dt.datetime
     offset: int

@@ -8,6 +8,8 @@ from vobjectx import VERSION, iCalendar, new_from_behavior, read_one
 
 from .common import TEST_FILE_DIR, get_test_file
 
+tzs_from_file = dateutil.tz.tzical(f"{TEST_FILE_DIR}/timezones.ics").get("US/Pacific")
+
 
 def test_scratchbuild():
     """CreateCalendar 2.0 format from scratch"""
@@ -16,9 +18,7 @@ def test_scratchbuild():
     cal.add("vevent")
     cal.vevent.add("dtstart").value = dt.datetime(2006, 5, 9)
     cal.vevent.add("description").value = "Test event"
-    cal.vevent.add("created").value = dt.datetime(
-        2006, 1, 1, 10, tzinfo=dateutil.tz.tzical(f"{TEST_FILE_DIR}/timezones.ics").get("US/Pacific")
-    )
+    cal.vevent.add("created").value = dt.datetime(2006, 1, 1, 10, tzinfo=tzs_from_file)
     cal.vevent.add("uid").value = "Not very random UID"
     cal.vevent.add("dtstamp").value = dt.datetime(2017, 6, 26, 0, tzinfo=tzutc())
 

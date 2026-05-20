@@ -6,7 +6,7 @@ from dateutil.tz import gettz
 from vobjectx.change_tz import change_tz
 
 
-@dataclass
+@dataclass(slots=True)
 class Node:
     value: str
 
