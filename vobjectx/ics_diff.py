@@ -41,7 +41,7 @@ def delete_extraneous(component, ignore_dtstamp=False):
         del component.dtstamp_list
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ObjectWithSides:
     left: Component | ContentLine
     right: Component | ContentLine
