@@ -46,6 +46,8 @@ class TimezoneComponent(Component):
         The string used to refer to this timezone.
     """
 
+    __slots__ = ()
+
     def __init__(self, tzinfo=None, *args, **kwds):
         """
         Accept an existing Component or a tzinfo class.
@@ -294,6 +296,8 @@ class RecurringComponent(Component):
     @property rruleset:
         A U{rruleset<https://moin.conectiva.com.br/DateUtil>}.
     """
+
+    __slots__ = ()
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
@@ -704,12 +708,13 @@ class MultiDateBehavior(Behavior):
         tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
         value_param = getattr(obj, "value_param", "DATE-TIME").upper()
         val_texts = obj.value.split(",")
-        if value_param == "DATE":
-            obj.value = [vtypes.Date(x).value for x in val_texts]
-        elif value_param == "DATE-TIME":
-            obj.value = [vtypes.DateTime(x, tzinfo).value for x in val_texts]
-        elif value_param == "PERIOD":
-            obj.value = [vtypes.Period(x, tzinfo).value for x in val_texts]
+        match value_param:
+            case "DATE":
+                obj.value = [vtypes.Date(x).value for x in val_texts]
+            case "DATE-TIME":
+                obj.value = [vtypes.DateTime(x, tzinfo).value for x in val_texts]
+            case "PERIOD":
+                obj.value = [vtypes.Period(x, tzinfo).value for x in val_texts]
         return obj
 
     @staticmethod
@@ -1173,18 +1178,17 @@ class VAlarm(VCalendarComponentBehavior):
         if ("duration" in contents) ^ ("repeat" in contents):
             return fail("VALARM DURATION and REPEAT must both be present/absent.")
 
-        if action == "DISPLAY":
-            if "description" not in contents:
-                return fail("DISPLAY VALARM missing DESCRIPTION")
-
-        elif action == "EMAIL":
-            for prop in ("description", "summary", "attendee"):
-                if prop not in contents:
-                    return fail(f"EMAIL VALARM missing {prop.upper()}")
-
-        elif action == "AUDIO":
-            if len(contents.get("attach", [])) > 1:
-                return fail("AUDIO VALARM can contain only one ATTACH")
+        match action:
+            case "DISPLAY":
+                if "description" not in contents:
+                    return fail("DISPLAY VALARM missing DESCRIPTION")
+            case "EMAIL":
+                for prop in ("description", "summary", "attendee"):
+                    if prop not in contents:
+                        return fail(f"EMAIL VALARM missing {prop.upper()}")
+            case "AUDIO":
+                if len(contents.get("attach", [])) > 1:
+                    return fail("AUDIO VALARM can contain only one ATTACH")
 
         return super().validate(obj, raise_exception, complain_unrecognized)
 
@@ -1351,13 +1355,14 @@ class Trigger(Behavior):
 
     @staticmethod
     def transform_from_native(obj):
-        if type(obj.value) is dt.datetime:
-            obj.value_param = "DATE-TIME"
-            return UTCDateTimeBehavior.transform_from_native(obj)
-        if type(obj.value) is dt.timedelta:
-            return Duration.transform_from_native(obj)
-
-        raise NativeError("Native TRIGGER values must be timedelta or datetime")
+        match obj.value:
+            case dt.datetime():
+                obj.value_param = "DATE-TIME"
+                return UTCDateTimeBehavior.transform_from_native(obj)
+            case dt.timedelta():
+                return Duration.transform_from_native(obj)
+            case _:
+                raise NativeError("Native TRIGGER values must be timedelta or datetime")
 
 
 register_behavior(Trigger)
@@ -1423,10 +1428,12 @@ register_behavior(RRule, "EXRULE")
 
 # ------------------------ Registration of common classes ----------------------
 utc_date_time_list = ["LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP"]
-list(map(lambda x: register_behavior(UTCDateTimeBehavior, x), utc_date_time_list))
+for x in utc_date_time_list:
+    register_behavior(UTCDateTimeBehavior, x)
 
 date_time_or_date_list = ["DTEND", "DTSTART", "DUE", "RECURRENCE-ID"]
-list(map(lambda x: register_behavior(DateOrDateTimeBehavior, x), date_time_or_date_list))
+for x in date_time_or_date_list:
+    register_behavior(DateOrDateTimeBehavior, x)
 
 register_behavior(MultiDateBehavior, "RDATE")
 register_behavior(MultiDateBehavior, "EXDATE")
@@ -1437,9 +1444,12 @@ text_list = [
     "PRODID", "RELATED-TO", "STATUS", "SUMMARY", "TRANSP", "UID",
 ]
 # fmt:on
-list(map(lambda x: register_behavior(TextBehavior, x), text_list))
+for x in text_list:
+    register_behavior(TextBehavior, x)
 
-list(map(lambda x: register_behavior(MultiTextBehavior, x), ["CATEGORIES", "RESOURCES"]))
+for x in ["CATEGORIES", "RESOURCES"]:
+    register_behavior(MultiTextBehavior, x)
+
 register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
 
 if __name__ == "__main__":

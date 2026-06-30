@@ -10,21 +10,21 @@ def timedelta_to_string(delta: dt.timedelta) -> str:
     """Convert timedelta to an ical DURATION format: PnYnMnDTnHnMnS"""
     sign = "-" if delta.days < 0 else ""
     days, hours, minutes, seconds = split_delta(abs(delta))
-
-    output = f"{sign}P"
+    parts = [f"{sign}P"]
     if days:
-        output += f"{days}D"
+        parts.append(f"{days}D")
     if hours or minutes or seconds:
-        output += "T"
+        parts.append("T")
+        if hours:
+            parts.append(f"{hours}H")
+        if minutes:
+            parts.append(f"{minutes}M")
+        if seconds:
+            parts.append(f"{seconds}S")
     elif not days:  # Deal with zero duration
-        output += "T0S"
-    if hours:
-        output += f"{hours}H"
-    if minutes:
-        output += f"{minutes}M"
-    if seconds:
-        output += f"{seconds}S"
-    return output
+        parts.append("T0S")
+
+    return "".join(parts)
 
 
 def time_to_string(date_or_date_time) -> str:

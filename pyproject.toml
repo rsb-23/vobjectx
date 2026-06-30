@@ -7,11 +7,7 @@ name = "vobjectx"
 dynamic = ["version"]
 description = "A full-featured Python3 package for parsing and creating \"iCalendar and vCard files\""
 readme = "README.md"
-authors = [
-    { name = "Jeffrey Harris", email = "jeffrey@osafoundation.org" },
-    { name = "David Arnold", email = "davida@pobox.com" },
-    { name = "Rishabh B", email = "null@example.com" }
-]
+authors = [{ name = "Rishabh B" }]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: Apache Software License",

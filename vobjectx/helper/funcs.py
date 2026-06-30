@@ -17,7 +17,7 @@ def to_list(string_or_list) -> list:
 
 def to_string(value, sep=" ") -> str:
     """Turn a string or array value into a string"""
-    return sep.join(value) if type(value) in (list, tuple) else value
+    return sep.join(value) if isinstance(value, list | tuple) else value
 
 
 def backslash_escape(s: str) -> str:
@@ -32,16 +32,16 @@ def cached_print(*x):
 
 def split_by_size(text: str, byte_size: int) -> Iterator[str]:
     start = space_count = 0
-    encoded = text.encode()
+    encoded = memoryview(text.encode())
     total_size = len(encoded)
     while start < total_size - byte_size:
         k = byte_size - space_count + start
         while (encoded[k] & 0xC0) == 0x80:
             k -= 1
-        yield f"{encoded[start:k].decode()}{Char.CRLF} "
+        yield encoded[start:k].tobytes().decode() + "\r\n "
         space_count = 1
         start = k
-    yield encoded[start:].decode()
+    yield encoded[start:].tobytes().decode()
 
 
 def byte_decoder(text: str | bytes, encoding="base64") -> bytes:

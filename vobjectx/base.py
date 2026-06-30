@@ -30,6 +30,8 @@ class VBase:
     Current spec: 4.0 (http://tools.ietf.org/html/rfc6350)
     """
 
+    __slots__ = ("name", "group", "behavior", "parent_behavior", "is_native", "is_encoded")
+
     def __init__(self, group=None, *args, **kwds):
         super().__init__(*args, **kwds)
         self.name = None
@@ -197,7 +199,7 @@ class ContentLine(VBase):
         empty list as the value.
     @ivar value:
         The value of the contentline.
-    @ivar encoded:
+    @ivar is_encoded:
         A boolean describing whether the data in the content line is encoded.
         Generally, text read from a serialized vCard or vCalendar should be
         considered encoded.  Data added programmatically should not be encoded.
@@ -205,17 +207,19 @@ class ContentLine(VBase):
         An optional line number associated with the contentline.
     """
 
-    # pylint: disable=r0902,r0917
+    # pylint: disable=r0902
+    __slots__ = ("params", "value", "line_number")
+
     def __init__(
         self,
         name: str,
         params: list,
         value: str,
         group=None,
+        *args,
         is_encoded: bool = False,
         is_native: bool = False,
         line_number: int = None,
-        *args,
         **kwds,
     ):
         """
@@ -238,7 +242,8 @@ class ContentLine(VBase):
             if len(x) > 1:
                 paramlist.extend(x[1:])
 
-        list(map(update_table, params))
+        for param in params:
+            update_table(param)
 
         qp = False
         if "ENCODING" in self.params and "QUOTED-PRINTABLE" in self.params["ENCODING"]:
@@ -413,6 +418,8 @@ class Component(VBase):
         be serialized.
     """
 
+    __slots__ = ("contents", "use_begin")
+
     def __init__(self, name="", *args, **kwds):
         super().__init__(*args, **kwds)
         self.contents = ContentDict()
@@ -456,7 +463,7 @@ class Component(VBase):
         """
         # if the object is being re-created by pickle, self.contents may not
         # be set, don't get into an infinite loop over the issue
-        if name == "contents":
+        if name in self.__slots__:
             return object.__getattribute__(self, name)
         try:
             if name.endswith("_list"):
@@ -807,21 +814,22 @@ def read_components(
             raise e
 
         # 2. Parse vline
-        if vline.name == "VERSION":
-            version_line = vline
-            stack.modify_top(vline)
-        elif vline.name == "BEGIN":
-            stack.push(Component(vline.value, group=vline.group))
-        elif vline.name == "PROFILE":
-            if not stack.top():
-                stack.push(Component())
-            stack.top().set_profile(vline.value)
-        elif vline.name == "END":
-            _component = _handle_end()
-            if _component:
-                yield _component
-        else:
-            stack.modify_top(vline)  # not a START or END line
+        match vline.name:
+            case "VERSION":
+                version_line = vline
+                stack.modify_top(vline)
+            case "BEGIN":
+                stack.push(Component(vline.value, group=vline.group))
+            case "PROFILE":
+                if not stack.top():
+                    stack.push(Component())
+                stack.top().set_profile(vline.value)
+            case "END":
+                _component = _handle_end()
+                if _component:
+                    yield _component
+            case _:
+                stack.modify_top(vline)  # not a START or END line
 
     if stack.top():
         if stack.top_name() is None:

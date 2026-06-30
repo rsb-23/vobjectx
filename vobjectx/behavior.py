@@ -82,26 +82,27 @@ class Behavior:
         if isinstance(obj, ContentLine):
             return obj.line_validate(obj, raise_exception, complain_unrecognized)
 
-        if isinstance(obj, Component):
-            count = {}
-            for child in obj.get_children():
-                if not child.validate(raise_exception, complain_unrecognized):
-                    return False
-                name = child.name.upper()
-                count[name] = count.get(name, 0) + 1
-            for key, val in cls.known_children.items():
-                if count.get(key, 0) < val[0]:
-                    if raise_exception:
-                        m = "{0} components must contain at least {1} {2}"
-                        raise ValidateError(m.format(cls.name, val[0], key))
-                    return False
-                if val[1] and count.get(key, 0) > val[1]:
-                    if raise_exception:
-                        m = "{0} components cannot contain more than {1} {2}"
-                        raise ValidateError(m.format(cls.name, val[1], key))
-                    return False
-            return True
-        raise VObjectError(f"{obj} is not a Component or Contentline")
+        if not isinstance(obj, Component):
+            raise VObjectError(f"{obj} is not a Component or Contentline")
+
+        count = {}
+        for child in obj.get_children():
+            if not child.validate(raise_exception, complain_unrecognized):
+                return False
+            name = child.name.upper()
+            count[name] = count.get(name, 0) + 1
+        for key, val in cls.known_children.items():
+            if count.get(key, 0) < val[0]:
+                if raise_exception:
+                    m = "{0} components must contain at least {1} {2}"
+                    raise ValidateError(m.format(cls.name, val[0], key))
+                return False
+            if val[1] and count.get(key, 0) > val[1]:
+                if raise_exception:
+                    m = "{0} components cannot contain more than {1} {2}"
+                    raise ValidateError(m.format(cls.name, val[1], key))
+                return False
+        return True
 
     @classmethod
     def decode(cls, line):
