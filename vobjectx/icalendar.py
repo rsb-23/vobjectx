@@ -1,8 +1,7 @@
-# pylint: disable=c0123,c0302,w0212, r0915
+# pylint: disable=c0123,c0302,w0212,r0912,r0915
 """Definitions and behavior for iCalendar, also known as vCalendar 2.0"""
 
 import datetime as dt
-import socket
 from itertools import chain
 
 from dateutil import rrule, tz
@@ -13,7 +12,7 @@ from .base import Component, ContentLine, VBase, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
 from .helper import backslash_escape, get_buffer, get_random_int, logger
-from .helper.constants_tmp import DATENAMES, DATESANDRULES, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
+from .helper.constants_tmp import DATENAMES, DATESANDRULES, HOSTNAME, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
 from .helper.serializer import (
@@ -23,6 +22,7 @@ from .helper.serializer import (
     period_to_string,
     timedelta_to_string,
 )
+from .helper.time_funcs import get_tzid
 from .ical import date_to_datetime_, from_last_week_, parse_dtstart, string_to_text_values
 from .registry import BehaviorRegistry, TzidRegistry
 
@@ -254,10 +254,8 @@ class TimezoneComponent(Component):
             # If tzinfo is UTC, we don't need a TZID
             return None
 
-        for attr in ("key", "tzid", "zone", "_tzid"):
-            tzid_ = getattr(tzinfo, attr, None)
-            if tzid_:
-                return tzid_
+        if tzid_ := get_tzid(tzinfo):
+            return tzid_
 
         # return tzname for standard (non-DST) time
         not_dst = dt.timedelta(0)
@@ -324,14 +322,7 @@ class RecurringComponent(Component):
             value = line.value.replace("\\", "")
             # If dtstart has no time zone, `until` shouldn't get one, either:
             ignoretz = not isinstance(dtstart, dt.datetime) or dtstart.tzinfo is None
-            try:
-                until = rrule.rrulestr(value, ignoretz=ignoretz)._until
-            except ValueError:
-                # WORKAROUND: dateutil<=2.7.2 doesn't set the time zone of dtstart
-                if ignoretz:
-                    raise
-                utc_now = dt.datetime.now(dt.timezone.utc)
-                until = rrule.rrulestr(value, dtstart=utc_now)._until
+            until = rrule.rrulestr(value, ignoretz=ignoretz)._until
 
             if until is not None and isinstance(dtstart, dt.datetime) and (until.tzinfo != dtstart.tzinfo):
                 # dateutil converts the UNTIL date to a datetime,
@@ -497,14 +488,11 @@ class RecurringComponent(Component):
                     self.add(name).value = setlist
             elif name in RULENAMES:
                 for rule_item in setlist:
-                    buf = get_buffer()
-                    buf.write(f"FREQ={rrule.FREQNAMES[rule_item._freq]}")
-
+                    parts = [f"FREQ={rrule.FREQNAMES[rule_item._freq]}"]
                     values = _parse_values_from_rule(rule_item)
-                    for key, paramvals in values.items():
-                        buf.write(f";{key}={','.join(paramvals)}")
 
-                    self.add(name).value = buf.getvalue()
+                    parts.extend(f"{key}={','.join(paramvals)}" for key, paramvals in values.items())
+                    self.add(name).value = ";".join(parts)
 
 
 class TextBehavior(Behavior):
@@ -575,14 +563,10 @@ class RecurringBehavior(VCalendarComponentBehavior):
 
         This is just a dummy implementation, for now.
         """
+        now = dt.datetime.now(UTC_TZ)
         if not hasattr(obj, "uid"):
-            now = dt.datetime.now(UTC_TZ)
-            now = datetime_to_string(now)
-            host = socket.gethostname()
-            obj.add(ContentLine("UID", [], f"{now} - {get_random_int()}@{host}"))
-
+            obj.add(ContentLine("UID", [], f"{datetime_to_string(now)} - {get_random_int()}@{HOSTNAME}"))
         if not hasattr(obj, "dtstamp"):
-            now = dt.datetime.now(UTC_TZ)
             obj.add("dtstamp").value = now
 
     @classmethod
@@ -842,6 +826,7 @@ class VCalendar2(VCalendarComponentBehavior):
             if tzid != "UTC" and tzid not in oldtzids:
                 obj.add(TimezoneComponent(tzinfo=TzidRegistry.get(tzid)))
 
+    # pylint: disable=r0914
     @classmethod
     def serialize(cls, obj, buf, line_length, validate=True, *args, **kwargs):
         """
@@ -861,23 +846,16 @@ class VCalendar2(VCalendarComponentBehavior):
         if obj.use_begin:
             fold_one_line(outbuf, f"{group_string}BEGIN:{obj.name}", line_length)
 
-        props, comps = set(), set()
-        for key in obj.contents.keys():
-            if isinstance(obj.contents[key][0], Component):
-                comps.add(key)
-            else:
-                props.add(key)
+        is_comp = {k: isinstance(v[0], Component) for k, v in obj.contents.items()}
+        content_keys = set(obj.contents)
+        sort_set = set(cls.sort_first)
 
-        first_props, first_components = [], []
-        for key in cls.sort_first:
-            if key in props:
-                first_props.append(key)
-                props.remove(key)
-            if key in comps:
-                first_components.append(key)
-                comps.remove(key)
+        first_props = [k for k in cls.sort_first if k in content_keys and not is_comp[k]]
+        first_comps = [k for k in cls.sort_first if k in content_keys and is_comp[k]]
+        rest_props = sorted(k for k in content_keys if k not in sort_set and not is_comp[k])
+        rest_comps = sorted(k for k in content_keys if k not in sort_set and is_comp[k])
 
-        sorted_keys = first_props + sorted(props) + first_components + sorted(comps)
+        sorted_keys = first_props + rest_props + first_comps + rest_comps
 
         for child in chain.from_iterable(obj.contents[key] for key in sorted_keys):
             # validate is recursive, we only need to validate once

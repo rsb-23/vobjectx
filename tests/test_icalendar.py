@@ -3,12 +3,12 @@ import re
 import zoneinfo
 from random import sample
 
-import dateutil
 import pytest
 from dateutil.rrule import MONTHLY, WEEKLY, rrule, rruleset
+from dateutil.tz import tzical
 
-from vobjectx import base
-from vobjectx.behavior import new_from_behavior
+from vobjectx import new_from_behavior, read_one
+from vobjectx.base import Component, text_line_to_content_line
 from vobjectx.datatypes import Period
 from vobjectx.exceptions import ValidateError
 from vobjectx.icalendar import (
@@ -20,30 +20,29 @@ from vobjectx.icalendar import (
     string_to_text_values,
     timedelta_to_string,
 )
+from vobjectx.patterns import line_re, patterns
 from vobjectx.registry import TzidRegistry
 
-from .common import TEST_FILE_DIR, get_test_file, two_hours
-
-UTC_TZ = dateutil.tz.tzutc()
+from .common import TEST_FILE_DIR, UTC_TZ, get_test_file, two_hours
 
 
 def test_parse_dtstart():
     """Should take a content line and return a datetime object."""
-    assert parse_dtstart(base.text_line_to_content_line("DTSTART:20060509T000000")) == dt.datetime(  # inline
+    assert parse_dtstart(text_line_to_content_line("DTSTART:20060509T000000")) == dt.datetime(  # inline
         2006, 5, 9, 0, 0
     )
 
 
 def test_regexes():
     """Test regex patterns"""
-    assert re.findall(base.patterns["name"], "12foo-bar:yay") == ["12foo-bar", "yay"]
-    assert re.findall(base.patterns["safe_char"], 'a;b"*,cd') == ["a", "b", "*", "c", "d"]
-    assert re.findall(base.patterns["qsafe_char"], 'a;b"*,cd') == ["a", ";", "b", "*", ",", "c", "d"]
+    assert re.findall(patterns["name"], "12foo-bar:yay") == ["12foo-bar", "yay"]
+    assert re.findall(patterns["safe_char"], 'a;b"*,cd') == ["a", "b", "*", "c", "d"]
+    assert re.findall(patterns["qsafe_char"], 'a;b"*,cd') == ["a", ";", "b", "*", ",", "c", "d"]
     assert re.findall(
-        base.patterns["param_value"], '"quoted";not-quoted;start"after-illegal-quote', re.VERBOSE  # inline
+        patterns["param_value"], '"quoted";not-quoted;start"after-illegal-quote', re.VERBOSE  # inline
     ) == ['"quoted"', "", "not-quoted", "", "start", "", "after-illegal-quote", ""]
 
-    match = base.line_re.match('TEST;ALTREP="http://www.wiz.org":value:;"')
+    match = line_re.match('TEST;ALTREP="http://www.wiz.org":value:;"')
     assert match.group("value") == 'value:;"'
     assert match.group("name") == "TEST"
     assert match.group("params") == ';ALTREP="http://www.wiz.org"'
@@ -92,7 +91,7 @@ def test_delta_to_offset():
 
 def test_vtimezone_creation():
     """Test timezones"""
-    tzs = dateutil.tz.tzical(f"{TEST_FILE_DIR}/timezones.ics")
+    tzs = tzical(f"{TEST_FILE_DIR}/timezones.ics")
     pacific = TimezoneComponent(tzs.get("US/Pacific"))
     assert str(pacific) == "<VTIMEZONE | <TZID{}US/Pacific>>"
     santiago = TimezoneComponent(tzs.get("Santiago"))
@@ -105,9 +104,9 @@ def test_vtimezone_creation():
 
 def test_timezone_serializing():
     """Serializing with timezones test"""
-    tzs = dateutil.tz.tzical(f"{TEST_FILE_DIR}/timezones.ics")
+    tzs = tzical(f"{TEST_FILE_DIR}/timezones.ics")
     pacific = tzs.get("US/Pacific")
-    cal = base.Component("VCALENDAR")
+    cal = Component("VCALENDAR")
     cal.set_behavior(VCalendar2_0)
     ev = cal.add("vevent")
     ev.add("dtstart").value = dt.datetime(2005, 10, 12, 9, tzinfo=pacific)
@@ -128,7 +127,7 @@ def test_zoneinfo_timezone_serializing():
     TzidRegistry.reset()  # Start with clean registry
 
     eastern = zoneinfo.ZoneInfo("US/Eastern")
-    cal = base.Component("VCALENDAR")
+    cal = Component("VCALENDAR")
     cal.set_behavior(VCalendar2_0)
     ev = cal.add("vevent")
     ev.add("dtstart").value = dt.datetime(2008, 10, 12, 9, tzinfo=eastern)
@@ -203,7 +202,7 @@ def test_availability():
 
 def get_dates_of_first_component(arg0):
     test_file = get_test_file(arg0)
-    cal = base.read_one(test_file)
+    cal = read_one(test_file)
     return list(cal.vevent.rruleset)
 
 
@@ -265,7 +264,7 @@ def test_issue50():
     See https://github.com/py-vobject/vobject/issues/50
     """
     test_file = get_test_file("vobject_0050.ics")
-    cal = base.read_one(test_file)
+    cal = read_one(test_file)
     assert dt.datetime(2024, 8, 12, 22, 30, tzinfo=UTC_TZ) == cal.vevent.dtend.value
 
 

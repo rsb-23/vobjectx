@@ -1,6 +1,6 @@
 from dateutil import parser as date_parser
 
-from vobjectx.icalendar import Component
+from vobjectx.base import Component
 from vobjectx.ics_diff import get_sort_key, sort_by_uid
 
 

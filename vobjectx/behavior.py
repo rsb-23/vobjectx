@@ -56,7 +56,7 @@ class Behavior:
     is_component = False
     allow_group = False
     force_utc = False
-    sort_first = []
+    sort_first = ()
 
     def __init__(self):
         raise VObjectError("Behavior subclasses are not meant to be instantiated")

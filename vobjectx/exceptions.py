@@ -1,3 +1,4 @@
+# pylint: disable=w0201
 import warnings
 
 
@@ -5,17 +6,17 @@ class VObjectError(Exception):
     def __init__(self, msg, line_number=None):
         super().__init__(msg)
         self.line_number = line_number
-        self.__notes__ = []
 
-    def add_note(self, note):
-        # TODO: remove this for 3.10 deprecation
+    def add_note(self, note):  # keep for 3.10 compatibility
+        if not hasattr(self, "__notes__"):
+            self.__notes__ = []
         self.__notes__.append(note)
 
     def __str__(self):
         msg = self.args[0]
         if self.line_number is not None:
             msg = f"At line {self.line_number}: {msg}"
-        if self.__notes__:
+        if hasattr(self, "__notes__"):
             msg += "\n" + "\n".join(self.__notes__)
         return msg
 

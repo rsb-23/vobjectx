@@ -4,8 +4,9 @@ import base64
 import contextlib
 import copy
 import sys
+from collections.abc import Callable, Iterable, Iterator
 from functools import lru_cache, partial
-from typing import Any, Callable, Iterable, Iterator, TextIO
+from typing import Any, TextIO
 
 if sys.version_info >= (3, 11):
     from typing import Self

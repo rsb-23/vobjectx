@@ -20,7 +20,7 @@ def split_delta(delta: dt.timedelta) -> SimpleDelta:
 
 
 def get_tzid(tzinfo) -> str | None:
-    for attr in ("key", "_tzid", "zone", "tzid"):
+    for attr in ("key", "tzid", "zone", "_tzid"):
         tzid_ = getattr(tzinfo, attr, None)
         if tzid_:
             return tzid_

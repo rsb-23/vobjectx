@@ -2,11 +2,11 @@ import datetime as dt
 from io import StringIO
 from zoneinfo import ZoneInfo
 
-from dateutil.tz import tzutc
-
 from vobjectx.base import fold_one_line
 from vobjectx.icalendar import date_to_string, datetime_to_string
 from vobjectx.vcard import to_list
+
+from .common import UTC_TZ
 
 
 def test_to_list():
@@ -24,7 +24,7 @@ def test_datetime_to_string():
     tz_0_offset = ZoneInfo("Africa/Dakar")
     tc = {
         (dt.datetime(2000, 10, 29, 3, 0), False): "20001029T030000",
-        (dt.datetime(2007, 3, 13, 12, 34, 32, tzinfo=tzutc()), True): "20070313T123432Z",
+        (dt.datetime(2007, 3, 13, 12, 34, 32, tzinfo=UTC_TZ), True): "20070313T123432Z",
         (dt.datetime(2000, 10, 29, 3, 0, tzinfo=tz_0_offset), False): "20001029T030000Z",
     }
     for inp, out in tc.items():

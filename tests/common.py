@@ -1,8 +1,11 @@
 import datetime as dt
 
+from dateutil import tz
+
 TEST_FILE_DIR = "tests/test_files"
 
 two_hours = dt.timedelta(hours=2)
+UTC_TZ = tz.tzutc()
 
 
 def get_test_file(file_name: str) -> str:

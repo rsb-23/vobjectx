@@ -1,13 +1,11 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-import re
-
 from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import Any, Iterator, Self, TextIO, contextlib, copy, sys
-from .patterns import patterns
+from .helper.imports_ import Any, Iterator, Self, TextIO, contextlib, copy
+from .patterns import line_re, logical_lines_re, param_values_re, params_re, wrap_re
 from .registry import BehaviorRegistry
 
 
@@ -124,8 +122,7 @@ class VBase:
             e.line_number = getattr(self, "line_number", None)
 
             # wrap errors in transformation in a ParseError
-            msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
-            msg = msg.format(e.line_number, sys.exc_info()[0], sys.exc_info()[1])
+            msg = f"In transform_to_native, unhandled exception on line {e.line_number}: {type(e)}: {e}"
             msg = f"{msg} ({str(self_orig)})"
             raise ParseError(msg, e.line_number) from e
 
@@ -154,8 +151,7 @@ class VBase:
                 e.line_number = line_number
                 raise
 
-            msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
-            msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
+            msg = f"In transform_from_native, unhandled exception on line {e.line_number}: {type(e)}: {e}"
             raise NativeError(msg, line_number) from e
 
     def transform_children_to_native(self):
@@ -433,11 +429,7 @@ class Component(VBase):
         # deep copy of contents
         self.contents = ContentDict()
         for key, lvalue in copyit.contents.items():
-            newvalue = []
-            for value in lvalue:
-                newitem = value.copy()
-                newvalue.append(newitem)
-            self.contents[key] = newvalue
+            self.contents[key] = [v.copy() for v in lvalue]
 
         self.name = copyit.name
         self.use_begin = copyit.use_begin
@@ -561,7 +553,8 @@ class Component(VBase):
             first = [s for s in self.behavior.sort_first if s in self.contents]
         else:
             first = []
-        return first + sorted(k for k in self.contents.keys() if k not in first)
+        first_set = set(first)
+        return first + sorted(k for k in self.contents if k not in first_set)
 
     def get_sorted_children(self):
         return [obj for k in self.sort_child_keys() for obj in self.contents[k]]
@@ -620,24 +613,10 @@ class Component(VBase):
 
 
 class ComponentStack(Stack):
-    def modify_top(self, item):
-        top = self.top()
-        if top:
-            top.add(item)
-        else:
-            new = Component()
-            self.push(new)
-            new.add(item)  # add sets behavior for item and children
-
-
-# --------- Parsing functions and parse_line regular expressions ----------------
-param_values_re = re.compile(patterns["param_value_grouped"], re.VERBOSE)
-params_re = re.compile(patterns["params_grouped"], re.VERBOSE)
-line_re = re.compile(patterns["line"], re.DOTALL | re.VERBOSE)
-begin_re = re.compile("BEGIN", re.IGNORECASE)
-
-wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
-logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
+    def top(self):
+        if not self.stack:
+            self.push(Component())
+        return self.stack[-1]
 
 
 def parse_params(string):
@@ -796,7 +775,8 @@ def read_components(
                 component.transform_children_to_native()
             return component  # EXIT POINT
 
-        stack.modify_top(stack.pop())
+        item = stack.pop()
+        stack.top().add(item)
         return None
 
     stream = get_buffer(stream_or_string)
@@ -817,19 +797,16 @@ def read_components(
         match vline.name:
             case "VERSION":
                 version_line = vline
-                stack.modify_top(vline)
+                stack.top().add(vline)
             case "BEGIN":
                 stack.push(Component(vline.value, group=vline.group))
             case "PROFILE":
-                if not stack.top():
-                    stack.push(Component())
                 stack.top().set_profile(vline.value)
             case "END":
-                _component = _handle_end()
-                if _component:
+                if _component := _handle_end():
                     yield _component
             case _:
-                stack.modify_top(vline)  # not a START or END line
+                stack.top().add(vline)
 
     if stack.top():
         if stack.top_name() is None:

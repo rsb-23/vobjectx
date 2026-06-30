@@ -1,3 +1,5 @@
+import re
+
 # Note that underscore is not legal for names, it's included because
 # Lotus Notes uses it
 patterns = {"name": "[a-zA-Z0-9_-]+", "safe_char": '[^";:,]', "qsafe_char": '[^"]'}
@@ -56,3 +58,13 @@ patterns["logicallines"] = r"""
 """.format(**patterns)
 
 patterns["wraporend"] = r"({wrap!s} | {lineend!s} )".format(**patterns)
+
+
+# --------- Parsing functions and parse_line regular expressions ----------------
+param_values_re = re.compile(patterns["param_value_grouped"], re.VERBOSE)
+params_re = re.compile(patterns["params_grouped"], re.VERBOSE)
+line_re = re.compile(patterns["line"], re.DOTALL | re.VERBOSE)
+begin_re = re.compile("BEGIN", re.IGNORECASE)
+
+wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
+logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
