@@ -3,7 +3,7 @@ repos:
     rev: v0.15.20
     hooks:
       - id: ruff-check
-        args: [--quiet]
+        args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

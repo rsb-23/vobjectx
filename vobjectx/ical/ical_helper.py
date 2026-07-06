@@ -4,6 +4,7 @@ from calendar import monthrange
 
 from vobjectx import datatypes as vtypes
 from vobjectx.exceptions import ParseError
+from vobjectx.helper import P
 from vobjectx.registry import TzidRegistry
 
 # -------------------- Helper funcs ---------------------------------------
@@ -67,11 +68,11 @@ def parse_dtstart(contentline, allow_signature_mismatch: bool = False) -> dt.dat
     (technically invalid) lines, if allow_signature_mismatch is True, try to parse both varieties.
     """
     tzinfo = TzidRegistry.get(getattr(contentline, "tzid_param", None))
-    value_param = getattr(contentline, "value_param", "DATE-TIME").upper()
+    value_param = getattr(contentline, "value_param", P.DATETIME).upper()
     parsed_dtstart = None
-    if value_param == "DATE":
+    if value_param == P.DATE:
         parsed_dtstart = vtypes.Date(contentline.value).value
-    elif value_param == "DATE-TIME":
+    elif value_param == P.DATETIME:
         try:
             parsed_dtstart = vtypes.DateTime(contentline.value, tzinfo).value
         except ParseError as e:

@@ -31,20 +31,20 @@ and an equivalent event in hCalendar format with various elements optimized appr
 
 import datetime as dt
 
-from .helper import Character, get_buffer, logger, pretty_xml
+from .helper import Character, P, get_buffer, logger, pretty_xml
 from .icalendar import VCalendar2_0
 from .registry import BehaviorRegistry
 
 
 class Event:
     def __init__(self, event):
-        self.url = event.get_child_value("url")
-        self.summary = event.get_child_value("summary")
-        self.dtstart = event.get_child_value("dtstart")
-        self.dtend = event.get_child_value("dtend")
-        self.location = event.get_child_value("location")
-        self.duration = event.get_child_value("duration")
-        self.description = event.get_child_value("description")
+        self.url = event.get_child_value(P.URL)
+        self.summary = event.get_child_value(P.SUMMARY)
+        self.dtstart = event.get_child_value(P.DTSTART)
+        self.dtend = event.get_child_value(P.DTEND)
+        self.location = event.get_child_value(P.LOCATION)
+        self.duration = event.get_child_value(P.DURATION)
+        self.description = event.get_child_value(P.DESCRIPTION)
 
     @staticmethod
     def machine_date(date_obj) -> str:
@@ -106,7 +106,7 @@ class HCalendar(VCalendar2_0):
 
         for event in vevents:
             _event = Event(event)
-            _event_data = [get_xml("summary", _event.summary, tag="span")]  # SUMMARY
+            _event_data = [get_xml(P.SUMMARY, _event.summary, tag="span")]  # SUMMARY
 
             # DTSTART
             if _event.dtstart is None:
@@ -136,8 +136,8 @@ class HCalendar(VCalendar2_0):
                     )
 
             # LOCATION
-            _event_data.append(get_xml("location", _event.location, tag="span", prefix="at "))
-            _event_data.append(get_xml("description", _event.description, tag="div"))
+            _event_data.append(get_xml(P.LOCATION, _event.location, tag="span", prefix="at "))
+            _event_data.append(get_xml(P.DESCRIPTION, _event.description, tag="div"))
 
             _event_str = Character.CRLF.join(_event_data)
             if _event.url:

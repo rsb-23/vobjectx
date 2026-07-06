@@ -11,7 +11,7 @@ from .__about__ import __version__ as VERSION
 from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
-from .helper import backslash_escape, get_buffer, get_random_int, logger
+from .helper import P, backslash_escape, get_buffer, get_random_int, logger
 from .helper.constants_tmp import DATENAMES, DATES_AND_RULES, HOSTNAME, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
@@ -659,7 +659,7 @@ class DateOrDateTimeBehavior(Behavior):
             return obj
 
         obj.value = parse_dtstart(obj, allow_signature_mismatch=True)
-        if getattr(obj, "value_param", "DATE-TIME").upper() == "DATE-TIME" and hasattr(obj, "tzid_param"):
+        if getattr(obj, "value_param", P.DATETIME).upper() == P.DATETIME and hasattr(obj, "tzid_param"):
             # Keep a copy of the original TZID around
             obj.params["X-VOBJ-ORIGINAL-TZID"] = [obj.tzid_param]
             del obj.tzid_param
@@ -673,7 +673,7 @@ class DateOrDateTimeBehavior(Behavior):
         if type(obj.value) is not dt.date:
             return DateTimeBehavior.transform_from_native(obj)
         obj.is_native = False
-        obj.value_param = "DATE"
+        obj.value_param = P.DATE
         obj.value = date_to_string(obj.value)
         return obj
 
@@ -697,14 +697,14 @@ class MultiDateBehavior(Behavior):
             obj.value = []
             return obj
         tzinfo = TzidRegistry.get(getattr(obj, "tzid_param", None))
-        value_param = getattr(obj, "value_param", "DATE-TIME").upper()
+        value_param = getattr(obj, "value_param", P.DATETIME).upper()
         val_texts = obj.value.split(",")
         match value_param:
-            case "DATE":
+            case P.DATE:
                 obj.value = [vtypes.Date(x).value for x in val_texts]
-            case "DATE-TIME":
+            case P.DATETIME:
                 obj.value = [vtypes.DateTime(x, tzinfo).value for x in val_texts]
-            case "PERIOD":
+            case P.PERIOD:
                 obj.value = [vtypes.Period(x, tzinfo).value for x in val_texts]
         return obj
 
@@ -720,10 +720,10 @@ class MultiDateBehavior(Behavior):
         obj.is_native = False
 
         if type(first) is dt.date:
-            obj.value_param = "DATE"
+            obj.value_param = P.DATE
             obj.value = ",".join([date_to_string(val) for val in obj.value])
         elif isinstance(first, tuple):  # PERIOD case
-            obj.value_param = "PERIOD"
+            obj.value_param = P.PERIOD
             obj.value = ",".join(period_to_string(v) for v in obj.value)
         else:  # DATE-TIME case
             tzid = None
@@ -998,7 +998,7 @@ class VEvent(RecurringBehavior):
 
     @classmethod
     def validate(cls, obj, raise_exception=False, complain_unrecognized=False):
-        if "dtend" in obj.contents and "duration" in obj.contents:
+        if P.DTEND in obj.contents and P.DURATION in obj.contents:
             if raise_exception:
                 raise ValidateError("VEVENT components cannot contain both DTEND and DURATION components")
             return False
@@ -1316,13 +1316,13 @@ class Trigger(Behavior):
         """
         if obj.is_native:
             return obj
-        value = getattr(obj, "value_param", "DURATION").upper()
+        value = getattr(obj, "value_param", P.DURATION).upper()
         if hasattr(obj, "value_param"):
             del obj.value_param
         if obj.value == "":
             obj.is_native = True
             return obj
-        if value == "DURATION":
+        if value == P.DURATION:
             try:
                 return Duration.transform_to_native(obj)
             except ParseError:
@@ -1335,7 +1335,7 @@ class Trigger(Behavior):
                     return DateTimeBehavior.transform_to_native(obj)
                 except AllException as e:
                     raise ParseError("TRIGGER with no VALUE not recognized as DURATION or as DATE-TIME") from e
-        elif value == "DATE-TIME":
+        elif value == P.DATETIME:
             # TRIGGERs with DATE-TIME values must be in UTC, we could validate that fact, for now we take it on faith.
             return DateTimeBehavior.transform_to_native(obj)
         else:
@@ -1345,7 +1345,7 @@ class Trigger(Behavior):
     def transform_from_native(obj):
         match obj.value:
             case dt.datetime():
-                obj.value_param = "DATE-TIME"
+                obj.value_param = P.DATETIME
                 return UTCDateTimeBehavior.transform_from_native(obj)
             case dt.timedelta():
                 return Duration.transform_from_native(obj)
@@ -1415,28 +1415,28 @@ register_behavior(RRule, "RRULE")
 register_behavior(RRule, "EXRULE")
 
 # ------------------------ Registration of common classes ----------------------
-utc_date_time_list = ["LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP"]
-for x in utc_date_time_list:
-    register_behavior(UTCDateTimeBehavior, x)
+utc_date_time_list = ("LAST-MODIFIED", "CREATED", "COMPLETED", "DTSTAMP")
+for p in utc_date_time_list:
+    register_behavior(UTCDateTimeBehavior, p)
 
-date_time_or_date_list = ["DTEND", "DTSTART", "DUE", "RECURRENCE-ID"]
-for x in date_time_or_date_list:
-    register_behavior(DateOrDateTimeBehavior, x)
+date_time_or_date_list = ("DTEND", "DTSTART", "DUE", "RECURRENCE-ID")
+for p in date_time_or_date_list:
+    register_behavior(DateOrDateTimeBehavior, p)
 
 register_behavior(MultiDateBehavior, "RDATE")
 register_behavior(MultiDateBehavior, "EXDATE")
 
 # fmt:off
-text_list = [
+text_list = (
     "ACTION", "BUSYTYPE", "CALSCALE", "CLASS", "COMMENT", "CONTACT", "DESCRIPTION", "LOCATION", "METHOD",
     "PRODID", "RELATED-TO", "STATUS", "SUMMARY", "TRANSP", "UID",
-]
+)
 # fmt:on
-for x in text_list:
-    register_behavior(TextBehavior, x)
+for p in text_list:
+    register_behavior(TextBehavior, p)
 
-for x in ["CATEGORIES", "RESOURCES"]:
-    register_behavior(MultiTextBehavior, x)
+for p in ("CATEGORIES", "RESOURCES"):
+    register_behavior(MultiTextBehavior, p)
 
 register_behavior(SemicolonMultiTextBehavior, "REQUEST-STATUS")
 
