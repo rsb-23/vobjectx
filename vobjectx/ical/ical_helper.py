@@ -1,10 +1,10 @@
 import datetime as dt
 import math
-
-from dateutil.relativedelta import relativedelta
+from calendar import monthrange
 
 from vobjectx import datatypes as vtypes
 from vobjectx.exceptions import ParseError
+from vobjectx.helper import P
 from vobjectx.registry import TzidRegistry
 
 # -------------------- Helper funcs ---------------------------------------
@@ -13,16 +13,13 @@ from vobjectx.registry import TzidRegistry
 def date_to_datetime_(dt_obj: dt.datetime | dt.date) -> dt.datetime:
     if isinstance(dt_obj, dt.datetime):
         return dt_obj
-    return dt.datetime.fromordinal(dt_obj.toordinal())
+    return dt.datetime.combine(dt_obj, dt.time.min)
 
 
 def from_last_week_(dt_: dt.datetime) -> int:
     """How many weeks from the end of the month dt is, starting from 1."""
-
-    next_month = dt.datetime(dt_.year, dt_.month, 1) + relativedelta(months=1)
-    time_diff = next_month - dt_
-    days_gap = time_diff.days + bool(time_diff.seconds)
-    return math.ceil(days_gap / 7)
+    days_in_month = monthrange(dt_.year, dt_.month)[1]
+    return math.ceil((days_in_month - dt_.day + 1) / 7)
 
 
 # -------------------- Parser funcs ---------------------------------------
@@ -71,11 +68,11 @@ def parse_dtstart(contentline, allow_signature_mismatch: bool = False) -> dt.dat
     (technically invalid) lines, if allow_signature_mismatch is True, try to parse both varieties.
     """
     tzinfo = TzidRegistry.get(getattr(contentline, "tzid_param", None))
-    value_param = getattr(contentline, "value_param", "DATE-TIME").upper()
+    value_param = getattr(contentline, "value_param", P.DATETIME).upper()
     parsed_dtstart = None
-    if value_param == "DATE":
+    if value_param == P.DATE:
         parsed_dtstart = vtypes.Date(contentline.value).value
-    elif value_param == "DATE-TIME":
+    elif value_param == P.DATETIME:
         try:
             parsed_dtstart = vtypes.DateTime(contentline.value, tzinfo).value
         except ParseError as e:

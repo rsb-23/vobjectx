@@ -3,12 +3,11 @@
 import datetime as dt
 
 import pytest
-from dateutil.tz import tzutc
 
 from vobjectx import read_components, read_one
 from vobjectx.base import ParseError, parse_params
 
-from .common import get_test_file
+from .common import UTC_TZ, get_test_file
 
 
 def test_read_one():
@@ -32,7 +31,7 @@ def test_importing():
     assert isinstance(c.vevent.dtstart.value, dt.datetime)
     assert str(c.vevent.dtend.value) == "2002-10-28 15:00:00-08:00"
     assert isinstance(c.vevent.dtend.value, dt.datetime)
-    assert c.vevent.dtstamp.value == dt.datetime(2002, 10, 28, 1, 17, 6, tzinfo=tzutc())
+    assert c.vevent.dtstamp.value == dt.datetime(2002, 10, 28, 1, 17, 6, tzinfo=UTC_TZ)
 
     vevent = c.vevent.transform_from_native()
     assert str(vevent.rrule) == "<RRULE{}FREQ=Weekly;COUNT=10>"

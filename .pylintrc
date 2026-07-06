@@ -6,9 +6,7 @@ ignore-paths=(?!(vobjectx|tests))/*
 max-line-length = 130
 
 [REFACTORING]
-max-args=8
-max-branches = 15
-max-locals = 16
+max-args=7
 
 [MESSAGES CONTROL]
 disable=

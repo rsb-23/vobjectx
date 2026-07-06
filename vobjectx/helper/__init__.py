@@ -1,5 +1,6 @@
 from .config import get_buffer, logger
 from .constants import Character
+from .enums import P, Param
 from .funcs import (
     backslash_escape,
     byte_decoder,

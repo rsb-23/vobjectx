@@ -7,7 +7,7 @@ class Cli:  # pylint: disable=r0903
 
 
 def run_cli_tool(toolname: str, args: list[str]):
-    return subprocess.run([toolname] + args, capture_output=True, text=True, check=False)
+    return subprocess.run([toolname, *args], capture_output=True, text=True, check=False)
 
 
 def test_change_tz():

@@ -1,6 +1,6 @@
-# pylint: disable=r0903
 import datetime as dt
 import re
+from dataclasses import dataclass, field
 
 from vobjectx.exceptions import ParseError
 from vobjectx.registry import TzidRegistry
@@ -10,24 +10,26 @@ def _is_duration(s: str) -> bool:
     return "P" in s[:2].upper()
 
 
+@dataclass(slots=True)
 class Date:
-    def __init__(self, date_: str):
-        self.text = date_
-        self._parse()
+    text: str
+    value: dt.date = field(init=False)
 
-    def _parse(self):
+    def __post_init__(self):
         self.value: dt.date = dt.datetime.strptime(self.text, "%Y%m%d").date()
 
 
+@dataclass(slots=True)
 class DateTime:
-    def __init__(self, date_time_: str, tzinfo: dt.tzinfo = None, strict: bool = False):
-        if not strict:
-            date_time_ = date_time_.strip()
-        self.text = date_time_
-        self.tzinfo = tzinfo
-        self._parse()
+    text: str
+    tzinfo: dt.tzinfo | None = None
+    strict: bool = False
+    value: dt.datetime = field(init=False)
 
-    def _parse(self):
+    def __post_init__(self):
+        if not self.strict:
+            self.text = self.text.strip()
+
         try:
             _datetime = dt.datetime.strptime(self.text[:15], "%Y%m%dT%H%M%S")
         except ValueError as e:
@@ -38,13 +40,14 @@ class DateTime:
         self.value = _datetime.replace(tzinfo=self.tzinfo)
 
 
+@dataclass(slots=True)
 class Duration:
-    def __init__(self, duration: str):
-        self.text = duration.strip()
-        self.value: dt.timedelta = dt.timedelta()
-        self._parse()
+    text: str
+    value: dt.timedelta = field(init=False)
 
-    def _parse(self):
+    def __post_init__(self):
+        self.text = self.text.strip()
+
         if "," in self.text:
             raise ParseError("DURATION must have a single value.")
 
@@ -60,18 +63,16 @@ class Duration:
         self.value = _sign * dt.timedelta(**params)
 
 
+@dataclass(slots=True)
 class Period:
-    def __init__(self, period: str, tzinfo: dt.tzinfo = None):
-        self.text = period
-        self.tzinfo = tzinfo
+    text: str
+    tzinfo: dt.tzinfo | None = None
+    is_explicit: bool = field(init=False, default=False)
+    start_dt: dt.datetime = field(init=False, default=None)
+    end_dt: dt.datetime = field(init=False, default=None)
+    delta: dt.timedelta = field(init=False, default=None)
 
-        self.is_explicit = False
-        self.start_dt = None
-        self.end_dt = None
-        self.delta = None
-        self._parse()
-
-    def _parse(self):
+    def __post_init__(self):
         start_dt, end_dt = self.text.split("/")
         self.start_dt = DateTime(start_dt, self.tzinfo).value
         if _is_duration(end_dt):
@@ -88,13 +89,13 @@ class Period:
         return self.start_dt, self.delta or self.end_dt
 
 
+@dataclass(slots=True)
 class Time:
-    def __init__(self, time: str, tzinfo: dt.tzinfo = None):
-        self.text = time
-        self.tzinfo = tzinfo
-        self._parse()
+    text: str
+    tzinfo: dt.tzinfo | None = None
+    value: dt.time = field(init=False)
 
-    def _parse(self):
+    def __post_init__(self):
         try:
             _time = dt.datetime.strptime(self.text[:6], "%H%M%S").time()
         except ValueError as e:

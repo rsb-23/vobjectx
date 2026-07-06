@@ -9,10 +9,10 @@
 - [Tim Baxter](): for all his work maintaining vobject over the past few years
 - [Adieu](): for keeping things alive on github
 - [Sameen Karim]() and [Will Percival](): for maintaining the package at Eventable.
-- [David Arnold](): for maintaining the package at py-vobject.
 
 ## Active Maintainers
 
+- [David Arnold](): for maintaining the package at py-vobject.
 - [Rishabh B](): for maintaining a modern version of the package.
 
 ## Special Thanks

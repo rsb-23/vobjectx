@@ -1,13 +1,11 @@
 """vobjectx module for reading vCard and vCalendar files."""
 
-import re
-
 from .custom_class import ContentDict, Stack
 from .exceptions import NativeError, ParseError, VObjectError
 from .helper import Character as Char
 from .helper import byte_decoder, get_buffer, logger, split_by_size
-from .helper.imports_ import Any, Iterator, Self, TextIO, contextlib, copy, sys
-from .patterns import patterns
+from .helper.imports_ import Any, Iterator, Self, TextIO, contextlib, copy
+from .patterns import line_re, logical_lines_re, param_values_re, params_re, wrap_re
 from .registry import BehaviorRegistry
 
 
@@ -29,6 +27,8 @@ class VBase:
 
     Current spec: 4.0 (http://tools.ietf.org/html/rfc6350)
     """
+
+    __slots__ = ("name", "group", "behavior", "parent_behavior", "is_native", "is_encoded")
 
     def __init__(self, group=None, *args, **kwds):
         super().__init__(*args, **kwds)
@@ -122,9 +122,8 @@ class VBase:
             e.line_number = getattr(self, "line_number", None)
 
             # wrap errors in transformation in a ParseError
-            msg = "In transform_to_native, unhandled exception on line {0}: {1}: {2}"
-            msg = msg.format(e.line_number, sys.exc_info()[0], sys.exc_info()[1])
-            msg = f"{msg} ({str(self_orig)})"
+            msg = f"In transform_to_native, unhandled exception on line {e.line_number}: {type(e)}: {e}"
+            msg = f"{msg} ({self_orig!s})"
             raise ParseError(msg, e.line_number) from e
 
     def transform_from_native(self):
@@ -152,8 +151,7 @@ class VBase:
                 e.line_number = line_number
                 raise
 
-            msg = "In transform_from_native, unhandled exception on line {0} {1}: {2}"
-            msg = msg.format(line_number, sys.exc_info()[0], sys.exc_info()[1])
+            msg = f"In transform_from_native, unhandled exception on line {e.line_number}: {type(e)}: {e}"
             raise NativeError(msg, line_number) from e
 
     def transform_children_to_native(self):
@@ -197,7 +195,7 @@ class ContentLine(VBase):
         empty list as the value.
     @ivar value:
         The value of the contentline.
-    @ivar encoded:
+    @ivar is_encoded:
         A boolean describing whether the data in the content line is encoded.
         Generally, text read from a serialized vCard or vCalendar should be
         considered encoded.  Data added programmatically should not be encoded.
@@ -205,17 +203,19 @@ class ContentLine(VBase):
         An optional line number associated with the contentline.
     """
 
-    # pylint: disable=r0902,r0917
+    # pylint: disable=r0902
+    __slots__ = ("params", "value", "line_number")
+
     def __init__(
         self,
         name: str,
         params: list,
         value: str,
         group=None,
+        *args,
         is_encoded: bool = False,
         is_native: bool = False,
         line_number: int = None,
-        *args,
         **kwds,
     ):
         """
@@ -238,7 +238,8 @@ class ContentLine(VBase):
             if len(x) > 1:
                 paramlist.extend(x[1:])
 
-        list(map(update_table, params))
+        for param in params:
+            update_table(param)
 
         qp = False
         if "ENCODING" in self.params and "QUOTED-PRINTABLE" in self.params["ENCODING"]:
@@ -305,10 +306,7 @@ class ContentLine(VBase):
         which are legal in IANA tokens.
         """
         if name.endswith("_param"):
-            if isinstance(value, list):
-                self.params[name] = value
-            else:
-                self.params[name] = [value]
+            self.params[name] = value if isinstance(value, list) else [value]
         elif name.endswith("_paramlist"):
             if isinstance(value, list):
                 self.params[name] = value
@@ -347,9 +345,9 @@ class ContentLine(VBase):
         # Filter out singleton params (empty lists) for display
         return f"<{self.name}{self.display_params}{value_repr}>"
 
-    def __unicode__(self):
-        # Filter out singleton params (empty lists) for display
-        return f"<{self.name}{self.display_params}{self.value_repr()}>"
+    # def __unicode__(self):
+    #     # Filter out singleton params (empty lists) for display
+    #     return f"<{self.name}{self.display_params}{self.value_repr()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -413,6 +411,8 @@ class Component(VBase):
         be serialized.
     """
 
+    __slots__ = ("contents", "use_begin")
+
     def __init__(self, name="", *args, **kwds):
         super().__init__(*args, **kwds)
         self.contents = ContentDict()
@@ -426,11 +426,7 @@ class Component(VBase):
         # deep copy of contents
         self.contents = ContentDict()
         for key, lvalue in copyit.contents.items():
-            newvalue = []
-            for value in lvalue:
-                newitem = value.copy()
-                newvalue.append(newitem)
-            self.contents[key] = newvalue
+            self.contents[key] = [v.copy() for v in lvalue]
 
         self.name = copyit.name
         self.use_begin = copyit.use_begin
@@ -456,7 +452,7 @@ class Component(VBase):
         """
         # if the object is being re-created by pickle, self.contents may not
         # be set, don't get into an infinite loop over the issue
-        if name == "contents":
+        if name in self.__slots__:
             return object.__getattribute__(self, name)
         try:
             if name.endswith("_list"):
@@ -504,10 +500,8 @@ class Component(VBase):
             try:
                 _id = self.behavior.known_children[name][2]
                 behavior = BehaviorRegistry.get(name, _id)
-                if behavior.is_component:
-                    obj = Component(name)
-                else:
-                    obj = ContentLine(name, [], "", group)
+                obj = Component(name) if behavior.is_component else ContentLine(name, [], "", group)
+
                 obj.parent_behavior = self.behavior
                 obj.behavior = behavior
                 obj = obj.transform_to_native()
@@ -554,7 +548,8 @@ class Component(VBase):
             first = [s for s in self.behavior.sort_first if s in self.contents]
         else:
             first = []
-        return first + sorted(k for k in self.contents.keys() if k not in first)
+        first_set = set(first)
+        return first + sorted(k for k in self.contents if k not in first_set)
 
     def get_sorted_children(self):
         return [obj for k in self.sort_child_keys() for obj in self.contents[k]]
@@ -613,24 +608,10 @@ class Component(VBase):
 
 
 class ComponentStack(Stack):
-    def modify_top(self, item):
-        top = self.top()
-        if top:
-            top.add(item)
-        else:
-            new = Component()
-            self.push(new)
-            new.add(item)  # add sets behavior for item and children
-
-
-# --------- Parsing functions and parse_line regular expressions ----------------
-param_values_re = re.compile(patterns["param_value_grouped"], re.VERBOSE)
-params_re = re.compile(patterns["params_grouped"], re.VERBOSE)
-line_re = re.compile(patterns["line"], re.DOTALL | re.VERBOSE)
-begin_re = re.compile("BEGIN", re.IGNORECASE)
-
-wrap_re = re.compile(patterns["wraporend"], re.VERBOSE)
-logical_lines_re = re.compile(patterns["logicallines"], re.VERBOSE)
+    def top(self):
+        if not self.stack:
+            self.push(Component())
+        return self.stack[-1]
 
 
 def parse_params(string):
@@ -642,10 +623,10 @@ def parse_params(string):
     for param in _all:
         name, values_string = param
         param_list = [name]
-        for pair in param_values_re.findall(values_string):
-            # pair looks like ('', value) or (value, '')
-            param_list.append(pair[0] or pair[1])
-
+        param_list.extend(
+            (pair[0] or pair[1])
+            for pair in param_values_re.findall(values_string)  # pair is ('', value) or (value, '')
+        )
         all_parameters.append(param_list)
     return all_parameters
 
@@ -738,10 +719,7 @@ def dquote_escape(param: str) -> str:
 
     if '"' in param:
         raise VObjectError("Double quotes aren't allowed in parameter values.")
-    for char in ",;:":  # sourcery skip # temp
-        if char in param:
-            return f'"{param}"'
-    return param
+    return f'"{param}"' if any(c in param for c in ",;:") else param
 
 
 def fold_one_line(outbuf: TextIO, input_: str, line_length=75):
@@ -759,7 +737,7 @@ def default_serialize(obj, buf, line_length):
     Encode and fold obj and its children, write to buf or return a string.
     """
     outbuf = buf or get_buffer()
-    if isinstance(obj, (Component, ContentLine)):
+    if isinstance(obj, Component | ContentLine):
         obj.default_serialize(outbuf, line_length)
     return buf or outbuf.getvalue()
 
@@ -789,7 +767,8 @@ def read_components(
                 component.transform_children_to_native()
             return component  # EXIT POINT
 
-        stack.modify_top(stack.pop())
+        item = stack.pop()
+        stack.top().add(item)
         return None
 
     stream = get_buffer(stream_or_string)
@@ -802,26 +781,24 @@ def read_components(
             vline = text_line_to_content_line(line, n)
         except VObjectError as e:
             if ignore_unreadable:
-                logger.error(f"Skipped line: {e.line_number or '?'}, message: {str(e)}")
+                logger.error(f"Skipped line: {e.line_number or '?'}, message: {e!s}")
                 continue
             raise e
 
         # 2. Parse vline
-        if vline.name == "VERSION":
-            version_line = vline
-            stack.modify_top(vline)
-        elif vline.name == "BEGIN":
-            stack.push(Component(vline.value, group=vline.group))
-        elif vline.name == "PROFILE":
-            if not stack.top():
-                stack.push(Component())
-            stack.top().set_profile(vline.value)
-        elif vline.name == "END":
-            _component = _handle_end()
-            if _component:
-                yield _component
-        else:
-            stack.modify_top(vline)  # not a START or END line
+        match vline.name:
+            case "VERSION":
+                version_line = vline
+                stack.top().add(vline)
+            case "BEGIN":
+                stack.push(Component(vline.value, group=vline.group))
+            case "PROFILE":
+                stack.top().set_profile(vline.value)
+            case "END":
+                if _component := _handle_end():
+                    yield _component
+            case _:
+                stack.top().add(vline)
 
     if stack.top():
         if stack.top_name() is None:

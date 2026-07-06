@@ -1,14 +1,13 @@
 import datetime as dt
 import json
 
-import dateutil
-from dateutil.tz import tzutc
+from dateutil.tz import tzical
 
 from vobjectx import VERSION, iCalendar, new_from_behavior, read_one
 
-from .common import TEST_FILE_DIR, get_test_file
+from .common import TEST_FILE_DIR, UTC_TZ, get_test_file
 
-tzs_from_file = dateutil.tz.tzical(f"{TEST_FILE_DIR}/timezones.ics").get("US/Pacific")
+tzs_from_file = tzical(f"{TEST_FILE_DIR}/timezones.ics").get("US/Pacific")
 
 
 def test_scratchbuild():
@@ -20,7 +19,7 @@ def test_scratchbuild():
     cal.vevent.add("description").value = "Test event"
     cal.vevent.add("created").value = dt.datetime(2006, 1, 1, 10, tzinfo=tzs_from_file)
     cal.vevent.add("uid").value = "Not very random UID"
-    cal.vevent.add("dtstamp").value = dt.datetime(2017, 6, 26, 0, tzinfo=tzutc())
+    cal.vevent.add("dtstamp").value = dt.datetime(2017, 6, 26, 0, tzinfo=UTC_TZ)
 
     cal.vevent.add("attendee").value = "mailto:froelich@example.com"
     cal.vevent.attendee.params["CN"] = ["Fröhlich"]
@@ -75,9 +74,11 @@ def test_unicode_multiline():
     cal.add("vevent")
     cal.vevent.add("created").value = dt.datetime.now()
     cal.vevent.add("summary").value = "Классное событие"
+    # fmt: off
     cal.vevent.add("description").value = (
         "Классное событие Классное событие Классное событие Классное событие Классное событие Классsdssdное событие"
     )
+    # fmt: on
 
     # json tries to encode as utf-8 and it would break if some chars could not be encoded
     json.dumps(cal.serialize())

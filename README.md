@@ -12,11 +12,9 @@ vObjectx is a full-featured Python3 package for parsing and generating vCard and
 It is a rewrite of the `py-vobject/vobject v0.9.8` package, updated to use modern Python syntax.  
 It improves code readability, standardization, and overall performance.
 
-### Disclaimer
-
-⚠️ Documentation is under-development, **refer [py-vobject/vobject][pyvobject]**
-
 ### Acknowledgements
+
+Upstream: [py-vobject/vobject][pyvobject]
 
 See [ACKNOWLEDGEMENTS.md][acknowledgement]
 

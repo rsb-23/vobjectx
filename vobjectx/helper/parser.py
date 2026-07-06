@@ -80,8 +80,4 @@ def tzinfo_eq(tzinfo1: dt.tzinfo, tzinfo2: dt.tzinfo, start_year: int = 1950, en
     t1_transitions = get_transistions(tzinfo1, start_year, end_year)
     t2_transitions = get_transistions(tzinfo2, start_year, end_year)
 
-    for t1, t2 in zip(t1_transitions, t2_transitions):
-        if t1 != t2:
-            return False
-
-    return True
+    return all(t1 == t2 for t1, t2 in zip(t1_transitions, t2_transitions))

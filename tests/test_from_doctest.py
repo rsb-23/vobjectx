@@ -3,10 +3,11 @@ from io import StringIO
 
 from dateutil import rrule
 
-import vobjectx as vo
-from vobjectx.vcard import Name
+from vobjectx import VERSION, iCalendar, read_one, vCard
+from vobjectx.base import get_logical_lines
+from vobjectx.vcard import Address, Name
 
-from .common import get_test_file
+from .common import UTC_TZ, get_test_file
 
 
 def test_get_logical_lines():
@@ -21,18 +22,18 @@ def test_get_logical_lines():
         "Line 1;encoding=quoted-printable:this is an evil=\n evil=\n format.",
         "Line 2 is a new line, it does not start with whitespace.",
     ]
-    result = [line for line, _ in vo.base.get_logical_lines(StringIO(test_lines))]
+    result = [line for line, _ in get_logical_lines(StringIO(test_lines))]
     assert result == expected
 
 
 def test_vobjectx():
     """Converted from doctest of vobjectx/__init__.py"""
-    x = vo.iCalendar()
+    x = iCalendar()
     x.add("vevent")
     assert str(x) == "<VCALENDAR| [<VEVENT| []>]>"
 
-    v, utc = x.vevent, vo.icalendar.UTC_TZ
-    v.add("dtstart").value = dt.datetime(2004, 12, 15, 14, tzinfo=utc)
+    v = x.vevent
+    v.add("dtstart").value = dt.datetime(2004, 12, 15, 14, tzinfo=UTC_TZ)
     assert str(v) == "<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>"
     assert str(x) == "<VCALENDAR| [<VEVENT| [<DTSTART{}2004-12-15 14:00:00+00:00>]>]>"
 
@@ -40,25 +41,27 @@ def test_vobjectx():
     newrule.rrule(rrule.rrule(rrule.WEEKLY, count=2, dtstart=v.dtstart.value))
     v.rruleset = newrule
     assert list(v.rruleset) == [
-        dt.datetime(2004, 12, 15, 14, 0, tzinfo=utc),
-        dt.datetime(2004, 12, 22, 14, 0, tzinfo=utc),
+        dt.datetime(2004, 12, 15, 14, 0, tzinfo=UTC_TZ),
+        dt.datetime(2004, 12, 22, 14, 0, tzinfo=UTC_TZ),
     ]
 
     v.add("uid").value = "randomuid@MYHOSTNAME"
-    v.add("dtstamp").value = dt.datetime(2006, 2, 15, 0, tzinfo=utc)
+    v.add("dtstamp").value = dt.datetime(2006, 2, 15, 0, tzinfo=UTC_TZ)
 
+    # fmt: off
     assert x.serialize() == (
-        f"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VOBJECTX//NONSGML Version {vo.VERSION}//EN\r\n"
+        f"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VOBJECTX//NONSGML Version {VERSION}//EN\r\n"
         "BEGIN:VEVENT\r\nUID:randomuid@MYHOSTNAME\r\nDTSTART:20041215T140000Z\r\n"
         "DTSTAMP:20060215T000000Z\r\n"  # not in actual test, newly added
         "RRULE:FREQ=WEEKLY;COUNT=2\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
     )
+    # fmt: on
 
 
 def test_unicode_in_vcards():
-    card = vo.vCard()
+    card = vCard()
     card.add("fn").value = "Hello\u1234 World!"
-    card.add("n").value = vo.vcard.Name("World", "Hello\u1234")
+    card.add("n").value = Name("World", "Hello\u1234")
     _full_address = {
         "street": "5\u1234 Nowhere, Apt 1",
         "city": "Berkeley",
@@ -66,7 +69,7 @@ def test_unicode_in_vcards():
         "country": "USA",
         "code": "94704",
     }
-    card.add("adr").value = vo.vcard.Address(**_full_address)
+    card.add("adr").value = Address(**_full_address)
     assert (
         str(card)
         == "<VCARD| [<ADR{}5ሴ Nowhere, Apt 1\nBerkeley, CA 94704\nUSA>, <FN{}Helloሴ World!>, <N{} Helloሴ  World >]>"
@@ -77,8 +80,8 @@ def test_unicode_in_vcards():
     )
 
     # Equality in vCards
-    assert card.adr.value != vo.vcard.Address("Just a street")
-    assert card.adr.value == vo.vcard.Address(**_full_address)
+    assert card.adr.value != Address("Just a street")
+    assert card.adr.value == Address(**_full_address)
 
     # Organization (org)
     card.add("org").value = ["Company, Inc.", "main unit", "sub-unit"]
@@ -87,7 +90,7 @@ def test_unicode_in_vcards():
 
 def _get_one_cal(filename):
     f = get_test_file(filename)
-    return vo.read_one(f)
+    return read_one(f)
 
 
 def test_ruby_rrule():
@@ -113,7 +116,7 @@ def test_opensync_vcs():
         "BEGIN:VEVENT\r\nDESCRIPTION;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:foo =C3=A5=0Abar =C3=A4=\r\n=0Abaz "
         "=C3=B6\r\nUID:20080406T152030Z-7822\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
     )
-    vcs = vo.read_one(vcs, allow_qp=True)
+    vcs = read_one(vcs, allow_qp=True)
     assert vcs.serialize().startswith(
         "BEGIN:VCALENDAR\r\nVERSION:1.0\r\nPRODID:-//OpenSync//NONSGML OpenSync vformat 0.3//EN\r\n"
         "BEGIN:VEVENT\r\nUID:20080406T152030Z-7822\r\nDESCRIPTION;CHARSET=UTF-8:foo å\\nbar ä\\nbaz ö\r\n"
@@ -125,6 +128,6 @@ def test_vcf_qp():
         "BEGIN:VCARD\nVERSION:2.1\nN;ENCODING=QUOTED-PRINTABLE:;=E9\nFN;ENCODING=QUOTED-PRINTABLE:=E9\nTEL;"
         "HOME:0111111111\nEND:VCARD\n\n"
     )
-    vcf = vo.read_one(vcf)
+    vcf = read_one(vcf)
     assert vcf.n.value == Name(given="é")
     assert vcf.serialize() == "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:é\r\nN:;é;;;\r\nTEL;HOME:0111111111\r\nEND:VCARD\r\n"

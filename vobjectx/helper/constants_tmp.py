@@ -1,12 +1,16 @@
+import socket
+
 from dateutil import rrule, tz
 
-# ------------------------------- Constants ------------------------------------
 DATENAMES = ("rdate", "exdate")
 RULENAMES = ("exrule", "rrule")
-DATESANDRULES = ("exrule", "rrule", "rdate", "exdate")
+DATES_AND_RULES = (*RULENAMES, *DATENAMES)
 
-WEEKDAYS = [str(x) for x in rrule.weekdays]
+WEEKDAYS = tuple(str(x) for x in rrule.weekdays)
 
 TRANSITIONS = "daylight", "standard"
 
 UTC_TZ = tz.tzutc()
+
+
+HOSTNAME = socket.gethostname()

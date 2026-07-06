@@ -2,6 +2,25 @@ from .exceptions import VObjectError
 from .helper.imports_ import lru_cache
 
 
+@lru_cache()
+def _rm_suffix(key) -> str:
+    for suffix in ("_list", "_param", "_paramlist"):
+        key = key.removesuffix(suffix)
+    return key
+
+
+@lru_cache()
+def _to_key(attr: str) -> str:
+    attr = _rm_suffix(attr)
+    return attr.upper().replace("_", "-")
+
+
+@lru_cache()
+def _to_attr(key: str) -> str:
+    key = _rm_suffix(key)
+    return key.lower().replace("-", "_")
+
+
 class ContentDict(dict):
     def __init__(self, **kwargs):
         super().__init__()
@@ -9,22 +28,12 @@ class ContentDict(dict):
             self[self._to_key(k)] = v
 
     @staticmethod
-    def _rm_suffix(key) -> str:
-        for suffix in ("_list", "_param", "_paramlist"):
-            key = key.removesuffix(suffix)
-        return key
+    def _to_attr(key: str) -> str:
+        return _to_attr(key)
 
-    @classmethod
-    @lru_cache()
-    def _to_key(cls, attr: str) -> str:
-        attr = cls._rm_suffix(attr)
-        return attr.upper().replace("_", "-")
-
-    @classmethod
-    @lru_cache()
-    def _to_attr(cls, key: str) -> str:
-        key = cls._rm_suffix(key)
-        return key.lower().replace("-", "_")
+    @staticmethod
+    def _to_key(key: str) -> str:
+        return _to_key(key)
 
     # --- dict style ---
     def __contains__(self, key: str):
@@ -53,12 +62,9 @@ class ContentDict(dict):
             if key.endswith("_list"):
                 raise VObjectError("Component list set to a non-list")
             value = [value]
-
-        object.__setattr__(self, self._to_attr(key), value)
         self[key] = value
 
     def __delattr__(self, key):
-        object.__delattr__(self, self._to_attr(key))
         del self[key]
 
 

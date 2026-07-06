@@ -58,7 +58,7 @@ class Address:
     def __str__(self):
         lines = "\n".join(to_string(getattr(self, val), "\n") for val in self.lines if getattr(self, val))
         one_line = tuple(to_string(getattr(self, val)) for val in self.one_line)
-        lines += "\n{0!s}, {1!s} {2!s}".format(*one_line)  # pylint:disable=c0209
+        lines += f"\n{one_line[0]!s}, {one_line[1]!s} {one_line[2]!s}"
         if self.country:
             lines += "\n" + to_string(self.country, "\n")
         return lines
