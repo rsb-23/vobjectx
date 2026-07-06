@@ -18,16 +18,13 @@ VObjectx Overview
 
     Validation
     ----------
-    L{Behavior<behavior.Behavior>} classes implement validation for
-    L{Component<base.Component>}s.  To validate, an object must have all
-    required children.  There (TODO: will be) a toggle to raise an exception or
-    just log unrecognized, non-experimental children and parameters.
+    Behavior classes validate Components. Pass raise_exception=True to raise
+    ValidateError on failure, or complain_unrecognized=True to reject unknown children.
 
     Creating objects programatically
     --------------------------------
-    A L{Component<base.Component>} can be created from scratch.  No encoding
-    is necessary, serialization will encode data automatically.  Factory
-    functions (TODO: will be) available to create standard objects.
+    Use iCalendar() and vCard() to create blank top-level components, or
+    new_from_behavior(name) for any registered component type.
 
     Serializing objects
     -------------------

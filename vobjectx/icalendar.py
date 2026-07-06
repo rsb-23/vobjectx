@@ -8,11 +8,11 @@ from dateutil import rrule, tz
 
 from . import datatypes as vtypes
 from .__about__ import __version__ as VERSION
-from .base import Component, ContentLine, VBase, fold_one_line
+from .base import Component, ContentLine, fold_one_line
 from .behavior import Behavior
 from .exceptions import AllException, NativeError, ParseError, ValidateError, VObjectError, warn_if_true
 from .helper import backslash_escape, get_buffer, get_random_int, logger
-from .helper.constants_tmp import DATENAMES, DATESANDRULES, HOSTNAME, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
+from .helper.constants_tmp import DATENAMES, DATES_AND_RULES, HOSTNAME, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
 from .helper.serializer import (
@@ -54,9 +54,8 @@ class TimezoneComponent(Component):
         """
         super().__init__(*args, **kwds)
         self.is_native = True
-        # hack to make sure a behavior is assigned
         if self.behavior is None:
-            self.behavior = VTimezone
+            self.behavior = BehaviorRegistry.get("VTIMEZONE")
         if tzinfo is not None:
             self.tzinfo = tzinfo
         if not hasattr(self, "name") or self.name == "":
@@ -242,8 +241,13 @@ class TimezoneComponent(Component):
                     end_date = end_date.replace(tzinfo=UTC_TZ) - rule["offsetfrom"]
                     end_string = f"UNTIL={datetime_to_string(end_date)}"
 
-                new_rule = ";".join(["FREQ=YEARLY", day_string, f"BYMONTH={rule['month']}", end_string])
-                comp.add("rrule").value = new_rule.strip(";")
+                parts = ["FREQ=YEARLY"]
+                if day_string:
+                    parts.append(day_string)
+                parts.append(f"BYMONTH={rule['month']}")
+                if end_string:
+                    parts.append(end_string)
+                comp.add("rrule").value = ";".join(parts)
 
     @staticmethod
     def pick_tzid(tzinfo, allow_utc=False):
@@ -354,7 +358,7 @@ class RecurringComponent(Component):
             add_func_(rule)
 
         rruleset = None
-        for name in DATESANDRULES:
+        for name in DATES_AND_RULES:
             addfunc = None
             for line in self.contents.get(name, ()):
                 # don't bother creating a rruleset unless there's a rule
@@ -426,8 +430,8 @@ class RecurringComponent(Component):
                 values_["UNTIL"] = [until_serialize(rule._until)]
 
             days = []
-            if rule._byweekday is not None and (
-                rrule.WEEKLY != rule._freq or len(rule._byweekday) != 1 or rule._dtstart.weekday() != rule._byweekday[0]
+            if rule._byweekday is not None and any(
+                (rule._freq != rrule.WEEKLY, len(rule._byweekday) != 1, rule._dtstart.weekday() != rule._byweekday[0])
             ):
                 # ignore byweekday if freq is WEEKLY and day correlates with dtstart because
                 # it was automatically set by dateutil
@@ -474,7 +478,7 @@ class RecurringComponent(Component):
         # make sure to convert time zones to UTC
         until_serialize = date_to_string if is_date else partial(datetime_to_string, convert_to_utc=True)
 
-        for name in DATESANDRULES:
+        for name in DATES_AND_RULES:
             if name in self.contents:
                 del self.contents[name]
             setlist = getattr(rruleset, f"_{name}")
@@ -516,7 +520,7 @@ class TextBehavior(Behavior):
             line.is_encoded = False
 
     @classmethod
-    def encode(cls, line: VBase):
+    def encode(cls, line: ContentLine):
         """Backslash escape line.value."""
         if not line.is_encoded:
             encoding = getattr(line, "encoding_param", None)
@@ -571,9 +575,12 @@ class RecurringBehavior(VCalendarComponentBehavior):
 
     @classmethod
     def validate(cls, obj, raise_exception=True, complain_unrecognized=False):
-        if hasattr(obj, "recurrence_id") and hasattr(obj, "dtstart"):
-            if type(obj.dtstart.value) is not type(obj.recurrence_id.value):
-                raise ValidateError("RECURRENCE-ID and DTSTART must be of same type")
+        if (
+            hasattr(obj, "recurrence_id")
+            and hasattr(obj, "dtstart")
+            and type(obj.dtstart.value) is not type(obj.recurrence_id.value)
+        ):
+            raise ValidateError("RECURRENCE-ID and DTSTART must be of same type")
         return super().validate(obj, raise_exception, complain_unrecognized)
 
 
@@ -706,16 +713,21 @@ class MultiDateBehavior(Behavior):
         """
         Replace the date, datetime or period tuples in obj.value with appropriate strings.
         """
-        if obj.value and type(obj.value[0]) is dt.date:
-            obj.is_native = False
+        if not obj.value or not obj.is_native:
+            return obj
+
+        first = obj.value[0]
+        obj.is_native = False
+
+        if type(first) is dt.date:
             obj.value_param = "DATE"
             obj.value = ",".join([date_to_string(val) for val in obj.value])
-
-        # Fixme: handle PERIOD case
-        elif obj.is_native:
-            obj.is_native = False
-            transformed = []
+        elif isinstance(first, tuple):  # PERIOD case
+            obj.value_param = "PERIOD"
+            obj.value = ",".join(period_to_string(v) for v in obj.value)
+        else:  # DATE-TIME case
             tzid = None
+            transformed = []
             for val in obj.value:
                 if tzid is None and type(val) is dt.datetime:
                     tzid = TimezoneComponent.register_tzinfo(val.tzinfo)
@@ -795,9 +807,8 @@ class VCalendar2(VCalendarComponentBehavior):
                     warn_if_true()
                     table.add(obj_.tzid_param)
                 elif type(obj_.value) is list:
-                    for _ in obj_.value:
-                        tzinfo = getattr(obj_.value, "tzinfo", None)
-                        warn_if_true(tzinfo is not None)
+                    for val in obj_.value:
+                        tzinfo = getattr(val, "tzinfo", None)
                         tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
                         if tzid_:
                             table.add(tzid_)

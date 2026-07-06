@@ -306,10 +306,7 @@ class ContentLine(VBase):
         which are legal in IANA tokens.
         """
         if name.endswith("_param"):
-            if isinstance(value, list):
-                self.params[name] = value
-            else:
-                self.params[name] = [value]
+            self.params[name] = value if isinstance(value, list) else [value]
         elif name.endswith("_paramlist"):
             if isinstance(value, list):
                 self.params[name] = value
@@ -503,10 +500,8 @@ class Component(VBase):
             try:
                 _id = self.behavior.known_children[name][2]
                 behavior = BehaviorRegistry.get(name, _id)
-                if behavior.is_component:
-                    obj = Component(name)
-                else:
-                    obj = ContentLine(name, [], "", group)
+                obj = Component(name) if behavior.is_component else ContentLine(name, [], "", group)
+
                 obj.parent_behavior = self.behavior
                 obj.behavior = behavior
                 obj = obj.transform_to_native()
@@ -628,10 +623,10 @@ def parse_params(string):
     for param in _all:
         name, values_string = param
         param_list = [name]
-        for pair in param_values_re.findall(values_string):
-            # pair looks like ('', value) or (value, '')
-            param_list.append(pair[0] or pair[1])
-
+        param_list.extend(
+            (pair[0] or pair[1])
+            for pair in param_values_re.findall(values_string)  # pair is ('', value) or (value, '')
+        )
         all_parameters.append(param_list)
     return all_parameters
 
@@ -724,10 +719,7 @@ def dquote_escape(param: str) -> str:
 
     if '"' in param:
         raise VObjectError("Double quotes aren't allowed in parameter values.")
-    for char in ",;:":  # sourcery skip # temp
-        if char in param:
-            return f'"{param}"'
-    return param
+    return f'"{param}"' if any(c in param for c in ",;:") else param
 
 
 def fold_one_line(outbuf: TextIO, input_: str, line_length=75):
