@@ -38,9 +38,11 @@ def test_regexes():
     assert re.findall(patterns["name"], "12foo-bar:yay") == ["12foo-bar", "yay"]
     assert re.findall(patterns["safe_char"], 'a;b"*,cd') == ["a", "b", "*", "c", "d"]
     assert re.findall(patterns["qsafe_char"], 'a;b"*,cd') == ["a", ";", "b", "*", ",", "c", "d"]
+    # fmt:off
     assert re.findall(
         patterns["param_value"], '"quoted";not-quoted;start"after-illegal-quote', re.VERBOSE  # inline
     ) == ['"quoted"', "", "not-quoted", "", "start", "", "after-illegal-quote", ""]
+    # fmt:on
 
     match = line_re.match('TEST;ALTREP="http://www.wiz.org":value:;"')
     assert match.group("value") == 'value:;"'

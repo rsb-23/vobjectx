@@ -1,0 +1,24 @@
+include = ["pyproject.toml", "tests/**/*.py", "vobjectx/**/*.py"]
+line-length = 120
+output-format = "concise"
+target-version = "py310"
+
+[format]
+docstring-code-line-length = 100
+skip-magic-trailing-comma = true
+
+[lint]
+select = ["F", "E", "W", "B", "I", "PL", "RUF005", "RUF010"]
+ignore = ["E203", "E501", "B905", "PLR2004", "PLW1641"]
+
+[lint.per-file-ignores]
+"*/__init__.py" = ["F401"]
+"base.py" = ["PLW2901"]
+"icalendar.py" = ["PLR0912", "PLR0915"]
+
+[lint.isort]
+split-on-trailing-comma = false
+combine-as-imports = false
+
+[lint.pylint]
+max-args = 7

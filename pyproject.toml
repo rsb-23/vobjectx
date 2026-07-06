@@ -52,23 +52,6 @@ include = ["vobjectx/", "LICENSE", "README.md", "pyproject.toml"]
 packages = ["vobjectx"]
 
 # Tool Config
-[tool.black]
-target-version = ["py310", "py311", "py312", "py313", "py314"]
-line-length = 120
-skip-magic-trailing-comma = true
-
-[tool.flake8]
-max-line-length = 120
-ignore = ["E203", "E501", "W503"]
-exclude = [".git", "__pycache__", "venv"]
-per-file-ignores = ["*/__init__.py: F401", "*/imports_.py: F401"]
-
-[tool.isort]
-profile = "black"
-line_length = 120
-multi_line_output = 3
-split_on_trailing_comma = false
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Path to your test files
 

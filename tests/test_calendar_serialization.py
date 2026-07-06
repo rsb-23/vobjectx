@@ -74,9 +74,11 @@ def test_unicode_multiline():
     cal.add("vevent")
     cal.vevent.add("created").value = dt.datetime.now()
     cal.vevent.add("summary").value = "Классное событие"
+    # fmt: off
     cal.vevent.add("description").value = (
         "Классное событие Классное событие Классное событие Классное событие Классное событие Классsdssdное событие"
     )
+    # fmt: on
 
     # json tries to encode as utf-8 and it would break if some chars could not be encoded
     json.dumps(cal.serialize())

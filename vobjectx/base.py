@@ -123,7 +123,7 @@ class VBase:
 
             # wrap errors in transformation in a ParseError
             msg = f"In transform_to_native, unhandled exception on line {e.line_number}: {type(e)}: {e}"
-            msg = f"{msg} ({str(self_orig)})"
+            msg = f"{msg} ({self_orig!s})"
             raise ParseError(msg, e.line_number) from e
 
     def transform_from_native(self):
@@ -348,9 +348,9 @@ class ContentLine(VBase):
         # Filter out singleton params (empty lists) for display
         return f"<{self.name}{self.display_params}{value_repr}>"
 
-    def __unicode__(self):
-        # Filter out singleton params (empty lists) for display
-        return f"<{self.name}{self.display_params}{self.value_repr()}>"
+    # def __unicode__(self):
+    #     # Filter out singleton params (empty lists) for display
+    #     return f"<{self.name}{self.display_params}{self.value_repr()}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -745,7 +745,7 @@ def default_serialize(obj, buf, line_length):
     Encode and fold obj and its children, write to buf or return a string.
     """
     outbuf = buf or get_buffer()
-    if isinstance(obj, (Component, ContentLine)):
+    if isinstance(obj, Component | ContentLine):
         obj.default_serialize(outbuf, line_length)
     return buf or outbuf.getvalue()
 
@@ -789,7 +789,7 @@ def read_components(
             vline = text_line_to_content_line(line, n)
         except VObjectError as e:
             if ignore_unreadable:
-                logger.error(f"Skipped line: {e.line_number or '?'}, message: {str(e)}")
+                logger.error(f"Skipped line: {e.line_number or '?'}, message: {e!s}")
                 continue
             raise e
 

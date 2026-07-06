@@ -268,7 +268,7 @@ class TimezoneComponent(Component):
         raise VObjectError(f"Unable to guess TZID for tzinfo {tzinfo!s}")
 
     def __repr__(self):
-        return f'<VTIMEZONE | {getattr(self, "tzid", "No TZID")}>'
+        return f"<VTIMEZONE | {getattr(self, 'tzid', 'No TZID')}>"
 
     def pretty_print(self, level=0, tabwidth=3):
         pre = " " * level * tabwidth
@@ -794,19 +794,18 @@ class VCalendar2(VCalendarComponentBehavior):
                 if getattr(obj_, "tzid_param", None):
                     warn_if_true()
                     table.add(obj_.tzid_param)
-                else:
-                    if type(obj_.value) is list:
-                        for _ in obj_.value:
-                            tzinfo = getattr(obj_.value, "tzinfo", None)
-                            warn_if_true(tzinfo is not None)
-                            tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
-                            if tzid_:
-                                table.add(tzid_)
-                    else:
+                elif type(obj_.value) is list:
+                    for _ in obj_.value:
                         tzinfo = getattr(obj_.value, "tzinfo", None)
+                        warn_if_true(tzinfo is not None)
                         tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
                         if tzid_:
                             table.add(tzid_)
+                else:
+                    tzinfo = getattr(obj_.value, "tzinfo", None)
+                    tzid_ = TimezoneComponent.register_tzinfo(tzinfo)
+                    if tzid_:
+                        table.add(tzid_)
             for child in obj_.get_children():
                 if obj_.name != "VTIMEZONE":
                     find_tzids(child, table)

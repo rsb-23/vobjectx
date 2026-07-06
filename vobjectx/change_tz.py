@@ -8,8 +8,10 @@ from dateutil import tz
 
 import vobjectx as vo
 
+UTC_TZ = tz.tzutc()
 
-def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=tz.tzutc()):
+
+def change_tz(cal, new_timezone, default, utc_only=False, utc_tz=UTC_TZ):
     """
     Change the timezone of the specified component.
 
@@ -39,10 +41,10 @@ def show_timezones():
 
 
 def convert_events(utc_only, ics_file, timezone_="UTC"):
-    print(f'Converting {"only UTC" if utc_only else "all"} events')
+    print(f"Converting {'only UTC' if utc_only else 'all'} events")
 
     print(f"... Reading {ics_file}")
-    with open(ics_file, "r") as f:  # pylint:disable=w1514
+    with open(ics_file) as f:  # pylint:disable=w1514
         cal = vo.read_one(f)
     change_tz(cal, new_timezone=tz.gettz(timezone_), default=tz.gettz("UTC"), utc_only=utc_only)
 

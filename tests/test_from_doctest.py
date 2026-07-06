@@ -48,12 +48,14 @@ def test_vobjectx():
     v.add("uid").value = "randomuid@MYHOSTNAME"
     v.add("dtstamp").value = dt.datetime(2006, 2, 15, 0, tzinfo=UTC_TZ)
 
+    # fmt: off
     assert x.serialize() == (
         f"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VOBJECTX//NONSGML Version {VERSION}//EN\r\n"
         "BEGIN:VEVENT\r\nUID:randomuid@MYHOSTNAME\r\nDTSTART:20041215T140000Z\r\n"
         "DTSTAMP:20060215T000000Z\r\n"  # not in actual test, newly added
         "RRULE:FREQ=WEEKLY;COUNT=2\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
     )
+    # fmt: on
 
 
 def test_unicode_in_vcards():
