@@ -15,13 +15,7 @@ from .helper import P, backslash_escape, get_buffer, get_random_int, logger
 from .helper.constants_tmp import DATENAMES, DATES_AND_RULES, HOSTNAME, RULENAMES, TRANSITIONS, UTC_TZ, WEEKDAYS
 from .helper.imports_ import base64, partial
 from .helper.parser import get_transition, tzinfo_eq
-from .helper.serializer import (
-    date_to_string,
-    datetime_to_string,
-    delta_to_offset,
-    period_to_string,
-    timedelta_to_string,
-)
+from .helper.serializer import delta_to_offset, to_string
 from .helper.time_funcs import get_tzid
 from .ical import date_to_datetime_, from_last_week_, parse_dtstart, string_to_text_values
 from .registry import BehaviorRegistry, TzidRegistry
@@ -239,7 +233,7 @@ class TimezoneComponent(Component):
                         )
                         end_date = du_rule[0]
                     end_date = end_date.replace(tzinfo=UTC_TZ) - rule["offsetfrom"]
-                    end_string = f"UNTIL={datetime_to_string(end_date)}"
+                    end_string = f"UNTIL={to_string(end_date)}"
 
                 parts = ["FREQ=YEARLY"]
                 if day_string:
@@ -476,7 +470,7 @@ class RecurringComponent(Component):
 
         dtstart = date_to_datetime_(dtstart)
         # make sure to convert time zones to UTC
-        until_serialize = date_to_string if is_date else partial(datetime_to_string, convert_to_utc=True)
+        until_serialize = to_string if is_date else partial(to_string, convert_to_utc=True)
 
         for name in DATES_AND_RULES:
             if name in self.contents:
@@ -569,7 +563,7 @@ class RecurringBehavior(VCalendarComponentBehavior):
         """
         now = dt.datetime.now(UTC_TZ)
         if not hasattr(obj, "uid"):
-            obj.add(ContentLine("UID", [], f"{datetime_to_string(now)} - {get_random_int()}@{HOSTNAME}"))
+            obj.add(ContentLine("UID", [], f"{to_string(now)} - {get_random_int()}@{HOSTNAME}"))
         if not hasattr(obj, "dtstamp"):
             obj.add("dtstamp").value = now
 
@@ -623,7 +617,7 @@ class DateTimeBehavior(Behavior):
         if obj.is_native:
             obj.is_native = False
             tzid = TimezoneComponent.register_tzinfo(obj.value.tzinfo)
-            obj_value: str | dt.datetime = datetime_to_string(obj.value, cls.force_utc)
+            obj_value: str | dt.datetime = to_string(obj.value, cls.force_utc)
             if not cls.force_utc and tzid is not None:
                 obj.tzid_param = tzid
             if obj.params.get("X-VOBJ-ORIGINAL-TZID"):
@@ -674,7 +668,7 @@ class DateOrDateTimeBehavior(Behavior):
             return DateTimeBehavior.transform_from_native(obj)
         obj.is_native = False
         obj.value_param = P.DATE
-        obj.value = date_to_string(obj.value)
+        obj.value = to_string(obj.value)
         return obj
 
 
@@ -721,10 +715,10 @@ class MultiDateBehavior(Behavior):
 
         if type(first) is dt.date:
             obj.value_param = P.DATE
-            obj.value = ",".join([date_to_string(val) for val in obj.value])
+            obj.value = ",".join([to_string(val) for val in obj.value])
         elif isinstance(first, tuple):  # PERIOD case
             obj.value_param = P.PERIOD
-            obj.value = ",".join(period_to_string(v) for v in obj.value)
+            obj.value = ",".join(to_string(v) for v in obj.value)
         else:  # DATE-TIME case
             tzid = None
             transformed = []
@@ -733,7 +727,7 @@ class MultiDateBehavior(Behavior):
                     tzid = TimezoneComponent.register_tzinfo(val.tzinfo)
                     if tzid is not None:
                         obj.tzid_param = tzid
-                transformed.append(datetime_to_string(val))
+                transformed.append(to_string(val))
             obj.value = ",".join(transformed)
         return obj
 
@@ -1292,7 +1286,7 @@ class Duration(Behavior):
         if not obj.is_native:
             return obj
         obj.is_native = False
-        obj.value = timedelta_to_string(obj.value)
+        obj.value = to_string(obj.value)
         return obj
 
 
@@ -1383,7 +1377,7 @@ class PeriodBehavior(Behavior):
         """
         if obj.is_native:
             obj.is_native = False
-            transformed = [period_to_string(tup, cls.force_utc) for tup in obj.value]
+            transformed = [to_string(tup, convert_to_utc=cls.force_utc) for tup in obj.value]
             if transformed:
                 tzid = TimezoneComponent.register_tzinfo(obj.value[-1][0].tzinfo)
                 if not cls.force_utc and tzid is not None:

@@ -21,7 +21,7 @@ import pytest
 
 from vobjectx import iCalendar, read_one
 from vobjectx.base import ContentLine
-from vobjectx.helper.serializer import period_to_string
+from vobjectx.helper.serializer import to_string
 from vobjectx.icalendar import MultiDateBehavior, TimezoneComponent
 from vobjectx.registry import TzidRegistry
 
@@ -239,7 +239,7 @@ class TestMultiDatePeriodRoundTrip:
         result = cl.transform_to_native().transform_from_native()
 
         # Rebuild expected string via period_to_string to avoid hard-coding
-        expected = ",".join(period_to_string(p) for p in _EXPECTED_NATIVE)
+        expected = ",".join(to_string(p) for p in _EXPECTED_NATIVE)
         assert result.value == expected
 
     def test_period_value_param_set_after_round_trip(self):

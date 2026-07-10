@@ -18,7 +18,7 @@ from vobjectx.icalendar import (
     delta_to_offset,
     parse_dtstart,
     string_to_text_values,
-    timedelta_to_string,
+    to_string,
 )
 from vobjectx.patterns import line_re, patterns
 from vobjectx.registry import TzidRegistry
@@ -71,8 +71,8 @@ def test_string_to_period():
 
 def test_timedelta_to_string():
     """Test timedelta strings"""
-    assert timedelta_to_string(two_hours) == "PT2H"
-    assert timedelta_to_string(dt.timedelta(minutes=20)) == "PT20M"
+    assert to_string(two_hours) == "PT2H"
+    assert to_string(dt.timedelta(minutes=20)) == "PT20M"
 
 
 def test_delta_to_offset():
