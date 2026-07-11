@@ -1,7 +1,0 @@
-pre-commit
-mypy
-pylint
-
-coverage
-hatchling
-wheel
