@@ -1,6 +1,4 @@
 name: Repo Cleaner
-permissions:
-  actions: write
 
 on:
   schedule:
@@ -16,3 +14,10 @@ jobs:
         with:
           retain_days: 15
           keep_minimum_runs: 5
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write

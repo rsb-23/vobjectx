@@ -31,7 +31,7 @@ requires-python = ">=3.10"
 
 [dependency-groups]
 build = ["build", "twine"]
-lint = ["pre-commit"]
+lint = ["pre-commit", "t-run"]
 test = ["pytest", "pytest-cov"]
 
 [project.scripts]

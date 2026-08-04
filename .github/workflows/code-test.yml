@@ -1,6 +1,4 @@
 name: Unit Tests
-permissions:
-  contents: read
 
 on:
   pull_request:
@@ -16,7 +14,7 @@ jobs:
     steps:
       - &checkout
         uses: rsb-23/actions/checkout@main
-      - uses: &test-runner ./.github/test-runner
+      - uses: &test-runner rsb-23/actions/test-runner@main
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
           coverage: true
@@ -48,3 +46,9 @@ jobs:
       - uses: *test-runner
         with:
           python-version: ${{ matrix.python-version }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
