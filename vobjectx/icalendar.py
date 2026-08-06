@@ -376,8 +376,10 @@ class RecurringComponent(Component):
                         return None
 
                 if name in DATENAMES:
-                    # ignoring RDATEs with PERIOD values for now
                     for _dt in line.value:
+                        if isinstance(_dt, tuple):
+                            # RFC 5545: PERIOD values contribute the period start
+                            _dt = _dt[0]
                         addfunc(date_to_datetime_(_dt))
                 elif name in RULENAMES:
                     _handle_rulenames(add_func_=addfunc)

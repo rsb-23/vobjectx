@@ -25,29 +25,13 @@ from vobjectx.helper.serializer import to_string
 from vobjectx.icalendar import MultiDateBehavior, TimezoneComponent
 from vobjectx.registry import TzidRegistry
 
+from .common import _make_cal
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 UTC = zoneinfo.ZoneInfo("UTC")
-
-# Minimal ICS wrapper so we can feed RDATE lines through the full parse stack.
-_VCAL_TMPL = """\
-BEGIN:VCALENDAR\r\n\
-VERSION:2.0\r\n\
-PRODID:-//Test//Test//EN\r\n\
-BEGIN:VEVENT\r\n\
-UID:{uid}\r\n\
-DTSTART:19960403T020000Z\r\n\
-DTSTAMP:20240101T000000Z\r\n\
-{extra}\r\n\
-END:VEVENT\r\n\
-END:VCALENDAR\r\n\
-"""
-
-
-def _make_cal(extra_line: str, uid: str = "test@example.com") -> str:
-    return _VCAL_TMPL.format(uid=uid, extra=extra_line)
 
 
 def _rrule_lines(serialized: str) -> list[str]:

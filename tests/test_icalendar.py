@@ -23,7 +23,7 @@ from vobjectx.icalendar import (
 from vobjectx.patterns import line_re, patterns
 from vobjectx.registry import TzidRegistry
 
-from .common import TEST_FILE_DIR, UTC_TZ, get_test_file, two_hours
+from .common import TEST_FILE_DIR, UTC_TZ, _make_cal, get_test_file, two_hours
 
 
 def test_parse_dtstart():
@@ -240,6 +240,12 @@ def test_recurring_component():
     vevent.dtstart.value = dt.date(2005, 3, 18)
     assert list(vevent.rruleset) == [dt.datetime(2005, 3, 29), dt.datetime(2005, 3, 31)]
     assert list(vevent.getrruleset(add_rdate=True)) == [dt.datetime(2005, 3, 18), dt.datetime(2005, 3, 29)]
+
+
+def test_getrruleset_rdate_period():
+    cal = read_one(_make_cal("RDATE;VALUE=PERIOD:19960403T020000Z/19960403T040000Z"))
+    rs = cal.vevent.getrruleset()
+    assert rs is not None
 
 
 def _recurrence_test(file_name):
