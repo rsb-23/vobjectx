@@ -3,7 +3,7 @@ from io import StringIO
 from zoneinfo import ZoneInfo
 
 from vobjectx.base import fold_one_line
-from vobjectx.icalendar import date_to_string, datetime_to_string
+from vobjectx.icalendar import to_string
 from vobjectx.vcard import to_list
 
 from .common import UTC_TZ
@@ -17,7 +17,7 @@ def test_to_list():
 def test_date_to_string():
     tc = {dt.date(2007, 5, 1): "20070501", dt.date(1997, 3, 17): "19970317"}
     for _date, out in tc.items():
-        assert date_to_string(_date) == out
+        assert to_string(_date) == out
 
 
 def test_datetime_to_string():
@@ -28,7 +28,7 @@ def test_datetime_to_string():
         (dt.datetime(2000, 10, 29, 3, 0, tzinfo=tz_0_offset), False): "20001029T030000Z",
     }
     for inp, out in tc.items():
-        assert datetime_to_string(*inp) == out
+        assert to_string(*inp) == out
 
 
 def test_fold_one_line():

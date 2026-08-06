@@ -1,6 +1,4 @@
 name: Unit Tests
-permissions:
-  contents: read
 
 on:
   pull_request:
@@ -16,14 +14,14 @@ jobs:
     steps:
       - &checkout
         uses: rsb-23/actions/checkout@main
-      - uses: &test-runner ./.github/test-runner
+      - uses: &test-runner rsb-23/actions/test-runner@main
         with:
           python-version: ${{ env.PY_BASE_VERSION }}
           coverage: true
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-report
           path: coverage.xml
@@ -48,3 +46,9 @@ jobs:
       - uses: *test-runner
         with:
           python-version: ${{ matrix.python-version }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }

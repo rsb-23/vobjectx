@@ -28,8 +28,10 @@ classifiers = [
 keywords = ["vobjectx", "icalendar", "vcard", "ics", "vcs", "hcalendar", "contacts", "vobjectx", "parser"]
 dependencies = ["python-dateutil >= 2.7.3", "tzdata; sys_platform == 'win32'"]
 requires-python = ">=3.10"
-[project.optional-dependencies]
-lint = ["pre-commit", "pylint"]
+
+[dependency-groups]
+build = ["build", "twine"]
+lint = ["pre-commit", "t-run"]
 test = ["pytest", "pytest-cov"]
 
 [project.scripts]

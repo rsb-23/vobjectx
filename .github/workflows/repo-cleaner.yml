@@ -1,6 +1,4 @@
 name: Repo Cleaner
-permissions:
-  actions: write
 
 on:
   schedule:
@@ -12,7 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2.1.0
+        uses: Mattraks/delete-workflow-runs@b3018382ca039b53d238908238bd35d1fb14f8ee # v2.1.0
         with:
           retain_days: 15
           keep_minimum_runs: 5
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write

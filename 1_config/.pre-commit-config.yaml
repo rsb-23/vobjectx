@@ -1,6 +1,6 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.20
+  - repo: https://github.com/rsb-23/trun
+    rev: v0.0.4
     hooks:
       - id: ruff-check
         args: [--fix]
