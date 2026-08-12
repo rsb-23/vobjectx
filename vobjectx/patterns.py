@@ -48,12 +48,12 @@ patterns["line"] = r"""
 
 
 # logical line regular expressions
-patterns["lineend"] = r"(?:\r\n|\r|\n|$)"
+patterns["lineend"] = r"(?:\r\n|\r|\n)"
 patterns["wrap"] = rf"{patterns['lineend']!s} [\t ]"
 patterns["logicallines"] = r"""
 (
    (?: [^\r\n] | {wrap!s} )*
-   {lineend!s}
+   (?: {lineend!s} | $ )
 )
 """.format(**patterns)
 

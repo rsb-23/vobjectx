@@ -667,7 +667,12 @@ def get_logical_lines(fp: TextIO, allow_qp: bool = True) -> Iterator:
 
         line_number = 1
         for match in logical_lines_re.finditer(val):
-            line, n = wrap_re.subn("", match.group())
+            log_line = match.group()
+            # It's possible that the final line of the vobject doesn't
+            # have a line ending.  For ease of parsing, just add it.
+            # This should really be in an 'if not strict' branch.
+            log_line += "" if log_line[-1:] in "\r\n" else "\r\n"
+            line, n = wrap_re.subn("", log_line)
             if line:
                 yield line, line_number
             line_number += n
