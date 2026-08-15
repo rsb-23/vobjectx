@@ -685,7 +685,7 @@ def get_logical_lines(fp: TextIO, allow_qp: bool = True) -> Iterator:
     for n, line in enumerate(fp, start=1):
         line = line.rstrip(Char.CRLF)
 
-        if line.rstrip() == "":
+        if not line:
             if logical_line:
                 yield get_value(logical_line), line_start_number
             line_start_number = n
@@ -693,7 +693,7 @@ def get_logical_lines(fp: TextIO, allow_qp: bool = True) -> Iterator:
             quoted_printable = False
             continue
 
-        if quoted_printable and allow_qp:
+        if quoted_printable:
             logical_line.append("\n")
             quoted_printable = False
         elif line[0] in Char.SPACEORTAB:
@@ -703,12 +703,13 @@ def get_logical_lines(fp: TextIO, allow_qp: bool = True) -> Iterator:
             line_start_number = n
             logical_line = []
         else:
+            line_start_number = n
             logical_line = []
         logical_line.append(line)
 
         # vCard 2.1 allows parameters to be encoded without a parameter name
         # False positives are unlikely, but possible.
-        if line[-1] == "=" and "quoted-printable" in get_value(logical_line).lower():
+        if line and line[-1] == "=" and "quoted-printable" in get_value(logical_line).lower():
             quoted_printable = True
 
     if logical_line:
